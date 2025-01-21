@@ -19,25 +19,25 @@ contract GoldToken is Initializable, ERC20PausableUpgradeable, AccessControlUpgr
 
     event Mint(address indexed to, uint256 amount);
     
-    function initialize() public initializer {
+    function initialize(address owner, address dataFeed_gold_address, address dataFeed_eth_address) public initializer {
         __ERC20_init("Gold", "GLD");
         __ERC20Pausable_init();
         __AccessControl_init();
         __UUPSUpgradeable_init();
 
-        _grantRole(OWNER_ROLE, msg.sender);
+        _grantRole(OWNER_ROLE, owner);
 
-        _setRoleAdmin(OWNER_ROLE, DEFAULT_ADMIN_ROLE);
+        _setRoleAdmin(OWNER_ROLE, OWNER_ROLE);
 
         dataFeed_gold = AggregatorV3Interface(
-            0xC5981F461d74c46eB4b0CF3f4Ec79f025573B0Ea
+            dataFeed_gold_address // 0xC5981F461d74c46eB4b0CF3f4Ec79f025573B0Ea
         );
         dataFeed_eth = AggregatorV3Interface(
-            0x694AA1769357215DE4FAC081bf1f309aDC325306
+            dataFeed_eth_address // 0x694AA1769357215DE4FAC081bf1f309aDC325306
         );
 
         fees = 5; // 5%
-        feesAddress = msg.sender;
+        feesAddress = owner;
     }
 
     constructor () initializer {}
@@ -60,7 +60,7 @@ contract GoldToken is Initializable, ERC20PausableUpgradeable, AccessControlUpgr
         _unpause();
     }
 
-    function mint() external payable {
+    function mint() external payable whenNotPaused {
         require(msg.value > 0, "GoldToken: mint value must be greater than 0");
         int goldPriceInEth = getGoldPriceInEth() * 10**10; // 10**8 + 10**10 = 10**18
         uint256 goldAmount = msg.value * 10**18 / uint256(goldPriceInEth);
@@ -72,11 +72,11 @@ contract GoldToken is Initializable, ERC20PausableUpgradeable, AccessControlUpgr
         emit Mint(msg.sender, goldAmount);
     }
 
-    function burn(uint256 amount) external {
+    function burn(uint256 amount) external whenNotPaused {
         _burn(msg.sender, amount);
     }
 
-    function getGoldPriceInEth() public view returns (int) {
+    function getGoldPriceInEth() internal view returns (int) {
         (,int gold_usd,,,) = dataFeed_gold.latestRoundData(); // 1 gold = x USD
         (,int eth_usd,,,) = dataFeed_eth.latestRoundData(); // 1 ETH = y USD
         return gold_usd * 10**8 / eth_usd; // 1 gold = (gold_usd / eth_usd) ETH
@@ -85,8 +85,13 @@ contract GoldToken is Initializable, ERC20PausableUpgradeable, AccessControlUpgr
     function getFees() external view returns (uint256) {
         return fees;
     }
+    
     function getFeesAddress() external view returns (address) {
         return feesAddress;
+    }
+
+    function hasOwnerRole(address account) external view returns (bool) {
+        return hasRole(OWNER_ROLE, account);
     }
 
     function setFeesAddress(address _feesAddress) external onlyRole(OWNER_ROLE) { // Lotterie contract
