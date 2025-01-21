@@ -69,7 +69,7 @@ contract GoldTokenTest is Test {
         assertEq(feesAddress, address(signers[0]));
     }
 
-    function test_getFees() public {
+    function test_getFees() public view {
         uint256 fees = goldToken.getFees();
         assertEq(fees, uint(5));
     }
@@ -107,4 +107,5 @@ contract GoldTokenTest is Test {
     }
 
     fallback() external payable{ }
+    receive() external payable{ }
 }
