@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
+pragma solidity 0.8.28;
 
 import "forge-std/Test.sol";
 import "../src/GoldToken.sol";
@@ -24,11 +24,7 @@ contract GoldTokenTest is Test {
         GoldToken implementation = new GoldToken();
         ERC1967Proxy proxy = new ERC1967Proxy(
             address(implementation),
-            abi.encodeWithSelector(GoldToken.initialize.selector, 
-            address(this),
-            address(mockGold),
-            address(mockETH)
-            )
+            abi.encodeWithSelector(GoldToken.initialize.selector, address(this), address(mockGold), address(mockETH))
         );
         goldToken = GoldToken(address(proxy));
     }
@@ -47,7 +43,7 @@ contract GoldTokenTest is Test {
 
     function test_pause() public {
         goldToken.pause();
-        
+
         vm.expectRevert();
         goldToken.mint();
 
@@ -71,21 +67,21 @@ contract GoldTokenTest is Test {
 
     function test_getFees() public view {
         uint256 fees = goldToken.getFees();
-        assertEq(fees, uint(5));
+        assertEq(fees, uint256(5));
     }
 
     function test_mintValueZero() public {
-        vm.expectRevert("GoldToken: mint value must be greater than 0");
-        goldToken.mint{value: 0}();
+        vm.expectRevert(GoldToken.MintValueMustBeGreaterThanZero.selector);
+        goldToken.mint{ value: 0 }();
     }
 
     function test_mintGoldValueZero() public {
-        vm.expectRevert("GoldToken: gold amount must be greater than 0");
-        goldToken.mint{value: 1}();
+        vm.expectRevert(GoldToken.GoldAmountMustBeGreaterThanZero.selector);
+        goldToken.mint{ value: 1 }();
     }
 
     function test_mint() public {
-        goldToken.mint{value: 10000}();
+        goldToken.mint{ value: 10000 }();
         uint256 balance = goldToken.balanceOf(address(this));
         assertEq(balance, 5000); // 1 GOLD = 0.5 ETH
         uint256 contractBalance = address(goldToken).balance;
@@ -94,7 +90,7 @@ contract GoldTokenTest is Test {
     }
 
     function test_burn() public {
-        goldToken.mint{value: 10000}();
+        goldToken.mint{ value: 10000 }();
         uint256 balance = goldToken.balanceOf(address(this));
         goldToken.burn(balance);
         balance = goldToken.balanceOf(address(this));
@@ -102,10 +98,10 @@ contract GoldTokenTest is Test {
     }
 
     function test_claimEth() public {
-        goldToken.mint{value: 10000}();
+        goldToken.mint{ value: 10000 }();
         goldToken.claimEth();
     }
 
-    fallback() external payable{ }
-    receive() external payable{ }
+    fallback() external payable { }
+    receive() external payable { }
 }
