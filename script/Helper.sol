@@ -175,8 +175,8 @@ contract Helper {
     address constant ccipBnMBobSepolia = 0x3B7d0d0CeC08eBF8dad58aCCa4719791378b2329;
     address constant ccipBnMWorldchainSepolia = 0x8fdE0C794fDA5a7A303Ce216f79B9695a7714EcB;
     address constant ccipBnMShibariumTestnet = 0x81249b4bD91A8706eE67a2f422DB82258D4947ad; 
-    address constant ccipBnMBitlayerTestnet = 0x0; // TODO obtain
-    address constant ccipBnMSoneiumMinatoSepolia = 0x0; // TODO obtain
+    //address constant ccipBnMBitlayerTestnet = 0x0; // TODO obtain
+    //address constant ccipBnMSoneiumMinatoSepolia = 0x0; // TODO obtain
     address constant ccipBnMFantomSonicTestnet = 0x230c46b9a7c8929A80863bDe89082B372a4c7A99;
     address constant ccipBnMCornTestnet = 0x996EfAb6011896Be832969D91E9bc1b3983cfdA1;
     address constant ccipBnMHashkeySepolia = 0xB0F91Ce2ECAa3555D4b1fD4489bD9a207a7844f0;
@@ -264,8 +264,8 @@ contract Helper {
             return (ccipBnMZircuitSepolia, clCcipLnMZircuitSepolia);
         } else if (network == SupportedNetworks.POLKADOT_ASTAR_SHIBUYA) {
             return (ccipBnMPolkadotAstarShibuya, clCcipLnMPolkadotAstarShibuya);
-        } else if (network == SupportedNetworks.MANTLE_SEPOLIA) {
-            return (ccipBnMMantleSepolia, clCcipLnMMantleSepolia);
+        // } else if (network == SupportedNetworks.MANTLE_SEPOLIA) {
+        //     return (ccipBnMMantleSepolia, clCcipLnMMantleSepolia);
         } else if (network == SupportedNetworks.BSQUARED_TESTNET) {
             return (ccipBnMBsquaredTestnet, address(0));
         } else if (network == SupportedNetworks.BOB_SEPOLIA) {
@@ -274,10 +274,10 @@ contract Helper {
             return (ccipBnMWorldchainSepolia, address(0));
         } else if (network == SupportedNetworks.SHIBARIUM_TESTNET) {
             return (ccipBnMShibariumTestnet, address(0));
-        } else if (network == SupportedNetworks.BITLAYER_TESTNET) {
-            return (ccipBnMBitlayerTestnet, address(0));
-        } else if (network == SupportedNetworks.SONEIUM_MINATO_SEPOLIA) {
-            return (ccipBnMSoneiumMinatoSepolia, address(0));
+        // } else if (network == SupportedNetworks.BITLAYER_TESTNET) {
+        //     return (ccipBnMBitlayerTestnet, address(0));
+        // } else if (network == SupportedNetworks.SONEIUM_MINATO_SEPOLIA) {
+        //     return (ccipBnMSoneiumMinatoSepolia, address(0));
         } else if (network == SupportedNetworks.FANTOM_SONIC_TESTNET) {
             return (ccipBnMFantomSonicTestnet, address(0));
         } else if (network == SupportedNetworks.CORN_TESTNET) {
@@ -351,15 +351,15 @@ contract Helper {
         } else if (network == SupportedNetworks.WORLDCHAIN_SEPOLIA) {
             return (routerWorldchainSepolia, linkWorldchainSepolia, wethWorldchainSepolia, chainIdWorldchainSepolia);
         } else if (network == SupportedNetworks.SHIBARIUM_TESTNET) {
-            return routerShibariumTestnet, linkShibariumTestnet, wboneShibariumTestnet, chainIdShibariumTestnet;
+            return (routerShibariumTestnet, linkShibariumTestnet, wboneShibariumTestnet, chainIdShibariumTestnet);
         } else if (network == SupportedNetworks.BITLAYER_TESTNET){
             return (routerBitlayerTestnet, linkBitlayerTestnet, wbtcBitlayerTestnet, chainIdBitlayerTestnet);
         } else if (network == SupportedNetworks.FANTOM_SONIC_TESTNET){
             return (routerFantomSonicTestnet, linkFantomSonicTestnet, wethFantomSonicTestnet, chainIdFantomSonicTestnet);
         } else if (network == SupportedNetworks.CORN_TESTNET){
             return (routerCornTestnet, linkCornTestnet, wbtcCornTestnet, chainIdCornTestnet);
-        } else if (network == SupportedNetworks.HASHKEY_SEPOLIA){
-            return (routerHashkeySepolia, linkHashkeySepolia, whskHashkeySepolia, chainIdHashkeySepolia);
+        // } else if (network == SupportedNetworks.HASHKEY_SEPOLIA){
+        //     return (routerHashkeySepolia, linkHashkeySepolia, whskHashkeySepolia, chainIdHashkeySepolia);
         } else if (network == SupportedNetworks.INK_SEPOLIA){
             return (routerInkSepolia, linkInkSepolia, wethInkSepolia, chainIdInkSepolia);
         }
