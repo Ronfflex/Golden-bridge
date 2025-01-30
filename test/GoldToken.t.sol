@@ -72,16 +72,16 @@ contract GoldTokenTest is Test {
 
     function test_mintValueZero() public {
         vm.expectRevert(GoldToken.MintValueMustBeGreaterThanZero.selector);
-        goldToken.mint{ value: 0 }();
+        goldToken.mint{value: 0}();
     }
 
     function test_mintGoldValueZero() public {
         vm.expectRevert(GoldToken.GoldAmountMustBeGreaterThanZero.selector);
-        goldToken.mint{ value: 1 }();
+        goldToken.mint{value: 1}();
     }
 
     function test_mint() public {
-        goldToken.mint{ value: 10000 }();
+        goldToken.mint{value: 10000}();
         uint256 balance = goldToken.balanceOf(address(this));
         assertEq(balance, 5000); // 1 GOLD = 0.5 ETH
         uint256 contractBalance = address(goldToken).balance;
@@ -90,7 +90,7 @@ contract GoldTokenTest is Test {
     }
 
     function test_burn() public {
-        goldToken.mint{ value: 10000 }();
+        goldToken.mint{value: 10000}();
         uint256 balance = goldToken.balanceOf(address(this));
         goldToken.burn(balance);
         balance = goldToken.balanceOf(address(this));
@@ -98,10 +98,10 @@ contract GoldTokenTest is Test {
     }
 
     function test_claimEth() public {
-        goldToken.mint{ value: 10000 }();
+        goldToken.mint{value: 10000}();
         goldToken.claimEth();
     }
 
-    fallback() external payable { }
-    receive() external payable { }
+    fallback() external payable {}
+    receive() external payable {}
 }
