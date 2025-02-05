@@ -16,6 +16,11 @@ contract GoldToken is Initializable, ERC20PausableUpgradeable, AccessControlUpgr
 
     uint256 internal _fees;
     address internal _feesAddress;
+    address internal _lotterieAddress;
+
+    uint256 _minimumGoldToBlock;
+    mapping(address => uint256) _timestamps;
+    address[] _users;
 
     error MintValueMustBeGreaterThanZero();
     error GoldAmountMustBeGreaterThanZero();
@@ -26,7 +31,7 @@ contract GoldToken is Initializable, ERC20PausableUpgradeable, AccessControlUpgr
         _disableInitializers();
     }
 
-    function initialize(address owner, address dataFeedGoldAddress, address dataFeedEthAddress) public initializer {
+    function initialize(address owner, address dataFeedGoldAddress, address dataFeedEthAddress, address lotterieAddress) public initializer {
         __ERC20_init("Gold", "GLD");
         __ERC20Pausable_init();
         __AccessControl_init();
@@ -45,6 +50,8 @@ contract GoldToken is Initializable, ERC20PausableUpgradeable, AccessControlUpgr
 
         _fees = 5; // 5%
         _feesAddress = owner;
+        _lotterieAddress = lotterieAddress;
+        _minimumGoldToBlock = 1 ether; // 1 GLD
     }
 
     function _authorizeUpgrade(address) internal override onlyRole(OWNER_ROLE) {}
@@ -79,15 +86,44 @@ contract GoldToken is Initializable, ERC20PausableUpgradeable, AccessControlUpgr
         uint256 fee = goldAmount * _fees / 100;
 
         goldAmount -= fee;
+        uint256 lotterieFee = fee / 2;
+
+        if(_timestamps[msg.sender] == 0) {
+            _users.push(msg.sender);
+            _timestamps[msg.sender] = block.timestamp;
+        }
 
         _mint(msg.sender, goldAmount);
-        _mint(_feesAddress, fee);
+        _mint(_lotterieAddress, lotterieFee);
+        _mint(_feesAddress, fee - lotterieFee);
 
         emit Mint(msg.sender, goldAmount);
     }
 
     function burn(uint256 amount) external whenNotPaused {
         _burn(msg.sender, amount);
+        if(balanceOf(msg.sender) <= _minimumGoldToBlock) {
+            removeUser(msg.sender);
+        }
+    }
+
+    function transfer(address to, uint256 amount) public override returns (bool) {
+        _transfer(msg.sender, to, amount);
+        if(balanceOf(msg.sender) <= _minimumGoldToBlock) {
+            removeUser(msg.sender);
+        }
+        return true;
+    }
+
+    function removeUser(address user) internal{
+        _timestamps[user] = 0;
+        for (uint256 i = 0; i < _users.length; i++) {
+            if (_users[i] == user) {
+                _users[i] = _users[_users.length - 1];
+                _users.pop();
+                break;
+            }
+        }
     }
 
     function _getGoldPriceInEth() internal view returns (int256) {

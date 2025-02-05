@@ -24,7 +24,7 @@ contract GoldTokenTest is Test {
         GoldToken implementation = new GoldToken();
         ERC1967Proxy proxy = new ERC1967Proxy(
             address(implementation),
-            abi.encodeWithSelector(GoldToken.initialize.selector, address(this), address(mockGold), address(mockETH))
+            abi.encodeWithSelector(GoldToken.initialize.selector, address(this), address(mockGold), address(mockETH), address(this))
         );
         goldToken = GoldToken(address(proxy));
     }
