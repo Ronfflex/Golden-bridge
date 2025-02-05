@@ -97,6 +97,13 @@ contract GoldTokenTest is Test {
         assertEq(balance, 0);
     }
 
+    function test_transfer() public {
+        goldToken.mint{value: 10000}(); // Receive 5000 GLD
+        goldToken.transfer(address(signers[0]), 1000);
+        uint256 balance = goldToken.balanceOf(address(this));
+        assertEq(balance, 4000);
+    }
+
     function test_claimEth() public {
         goldToken.mint{value: 10000}();
         goldToken.claimEth();
