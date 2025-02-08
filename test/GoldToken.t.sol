@@ -24,7 +24,7 @@ contract GoldTokenTest is Test {
         GoldToken implementation = new GoldToken();
         ERC1967Proxy proxy = new ERC1967Proxy(
             address(implementation),
-            abi.encodeWithSelector(GoldToken.initialize.selector, address(this), address(mockGold), address(mockETH), address(this))
+            abi.encodeWithSelector(GoldToken.initialize.selector, address(this), address(mockGold), address(mockETH), address(10))
         );
         goldToken = GoldToken(address(proxy));
     }
@@ -83,17 +83,17 @@ contract GoldTokenTest is Test {
     function test_mint() public {
         goldToken.mint{value: 10000}();
         uint256 balance = goldToken.balanceOf(address(this));
-        assertEq(balance, 5000); // 1 GOLD = 0.5 ETH
+        assertEq(balance, 4875); // 1 GOLD = 0.5 ETH
         uint256 contractBalance = address(goldToken).balance;
-        assertEq(balance, 5000);
+        assertEq(balance, 4875);
         assertEq(contractBalance, 10000);
     }
 
     function test_burn() public {
         goldToken.mint{value: 10000}();
-        uint256 balance = goldToken.balanceOf(address(this));
+        uint256 balance = goldToken.balanceOf(address(signers[0]));
         goldToken.burn(balance);
-        balance = goldToken.balanceOf(address(this));
+        balance = goldToken.balanceOf(address(signers[0]));
         assertEq(balance, 0);
     }
 
@@ -101,12 +101,28 @@ contract GoldTokenTest is Test {
         goldToken.mint{value: 10000}(); // Receive 5000 GLD
         goldToken.transfer(address(signers[0]), 1000);
         uint256 balance = goldToken.balanceOf(address(this));
-        assertEq(balance, 4000);
+        assertEq(balance, 3875);
     }
 
     function test_claimEth() public {
         goldToken.mint{value: 10000}();
         goldToken.claimEth();
+    }
+
+    function test_getUsers() public {
+        goldToken.mint{value: 10000}();
+        address[] memory users = goldToken.getUsers();
+        assertEq(users.length, 1);
+        assertEq(users[0], address(this));
+    }
+
+    function test_getTimestamps() public {
+        goldToken.mint{value: 10000}();
+        (address[] memory users, uint256[] memory timestamps) = goldToken.getTimestamps();
+        assertEq(users.length, 1);
+        assertEq(users[0], address(this));
+        assertEq(timestamps.length, 1);
+        assertEq(timestamps[0], block.timestamp);
     }
 
     fallback() external payable {}
