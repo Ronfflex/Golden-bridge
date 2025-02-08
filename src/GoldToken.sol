@@ -76,7 +76,7 @@ contract GoldToken is Initializable, ERC20PausableUpgradeable, AccessControlUpgr
             revert ValueMustBeGreaterThanZero();
         }
 
-        int256 goldPriceInEth = _getGoldPriceInEth() * 10 ** 10; // 10**8 + 10**10 = 10**18
+        int256 goldPriceInEth = getGoldPriceInEth() * 10 ** 10; // 10**8 + 10**10 = 10**18
         uint256 goldAmount = msg.value * 10 ** 18 / uint256(goldPriceInEth);
         if (goldAmount == 0) {
             revert AmountMustBeGreaterThanZero();
@@ -131,7 +131,7 @@ contract GoldToken is Initializable, ERC20PausableUpgradeable, AccessControlUpgr
         }
     }
 
-    function _getGoldPriceInEth() internal view returns (int256) {
+    function getGoldPriceInEth() public view returns (int256) {
         (, int256 goldUsd,,,) = _dataFeedGold.latestRoundData(); // 1 gold = x USD
         (, int256 ethUsd,,,) = _dataFeedEth.latestRoundData(); // 1 ETH = y USD
         return goldUsd * 10 ** 8 / ethUsd; // 1 gold = (goldUsd / ethUsd) ETH
