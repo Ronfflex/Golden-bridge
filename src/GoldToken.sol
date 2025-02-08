@@ -109,7 +109,7 @@ contract GoldToken is Initializable, ERC20PausableUpgradeable, AccessControlUpgr
 
     function transfer(address to, uint256 amount) public override returns (bool) {
         _transfer(msg.sender, to, amount);
-        if(balanceOf(msg.sender) <= _minimumGoldToBlock) {
+        if(msg.sender != _lotterieAddress && balanceOf(msg.sender) <= _minimumGoldToBlock) {
             removeUser(msg.sender);
         }
         return true;
@@ -138,6 +138,19 @@ contract GoldToken is Initializable, ERC20PausableUpgradeable, AccessControlUpgr
 
     function getFeesAddress() external view returns (address) {
         return _feesAddress;
+    }
+
+    function getUsers() external view returns (address[] memory) {
+        return _users;
+    }
+
+    function getTimestamps() external view returns (address[] memory, uint256[] memory) {
+        uint256 length = _users.length;
+        uint256[] memory timestamps = new uint256[](length);
+        for (uint256 i = 0; i < length; i++) {
+            timestamps[i] = _timestamps[_users[i]];
+        }
+        return (_users, timestamps);
     }
 
     function hasOwnerRole(address account) external view returns (bool) {
