@@ -31,7 +31,7 @@ contract Lotterie is Initializable, AccessControlUpgradeable, UUPSUpgradeable, V
     event RandomDrawed(uint256 requestId);
     event Winner(address winner);
 
-    constructor() VRFConsumerBaseV2Plus(_vrfCoordinator) {
+    constructor(address vrfCoordinator) VRFConsumerBaseV2Plus(vrfCoordinator)  {
         _disableInitializers();
     }
 
@@ -56,9 +56,17 @@ contract Lotterie is Initializable, AccessControlUpgradeable, UUPSUpgradeable, V
 
     function _authorizeUpgrade(address) internal override onlyRole(OWNER_ROLE) {}
 
-    function randomDraw() external onlyOwner returns (uint256 requestId) {
+    function addOwner(address account) external onlyRole(OWNER_ROLE) {
+        grantRole(OWNER_ROLE, account);
+    }
+
+    function removeOwner(address account) external onlyRole(OWNER_ROLE) {
+        revokeRole(OWNER_ROLE, account);
+    }
+
+    function randomDraw() external onlyRole(OWNER_ROLE) returns (uint256 requestId) {
         // One randomdraw per mounth
-        require(_lastRandomDraw + 30 days < block.timestamp, OneRandomDrawPerMounth());
+        require(_lastRandomDraw + 30 days <= block.timestamp, OneRandomDrawPerMounth());
 
        requestId = s_vrfCoordinator.requestRandomWords(
             VRFV2PlusClient.RandomWordsRequest({
@@ -68,7 +76,7 @@ contract Lotterie is Initializable, AccessControlUpgradeable, UUPSUpgradeable, V
                 callbackGasLimit: _callbackGasLimit,
                 numWords: _numWords,
                 // Set nativePayment to true to pay for VRF requests with Sepolia ETH instead of LINK
-                extraArgs: VRFV2PlusClient._argsToBytes(VRFV2PlusClient.ExtraArgsV1({nativePayment: true}))
+                extraArgs: VRFV2PlusClient._argsToBytes(VRFV2PlusClient.ExtraArgsV1({nativePayment: false}))
             })
         );
 
@@ -95,6 +103,10 @@ contract Lotterie is Initializable, AccessControlUpgradeable, UUPSUpgradeable, V
         require(_gains[msg.sender] > 0, "No gain to claim");
         _gains[msg.sender] = 0;
         _goldToken.transfer(msg.sender, _gains[msg.sender]);
+    }
+
+    function hasOwnerRole(address account) external view returns (bool) {
+        return hasRole(OWNER_ROLE, account);
     }
 
 }

@@ -24,9 +24,10 @@ contract GoldTokenTest is Test {
         GoldToken implementation = new GoldToken();
         ERC1967Proxy proxy = new ERC1967Proxy(
             address(implementation),
-            abi.encodeWithSelector(GoldToken.initialize.selector, address(this), address(mockGold), address(mockETH), address(10))
+            abi.encodeWithSelector(GoldToken.initialize.selector, address(this), address(mockGold), address(mockETH))
         );
         goldToken = GoldToken(address(proxy));
+        goldToken.setLotterieAddress(address(10));
     }
 
     function test_addOwner() public {
@@ -71,12 +72,12 @@ contract GoldTokenTest is Test {
     }
 
     function test_mintValueZero() public {
-        vm.expectRevert(GoldToken.MintValueMustBeGreaterThanZero.selector);
+        vm.expectRevert(GoldToken.ValueMustBeGreaterThanZero.selector);
         goldToken.mint{value: 0}();
     }
 
     function test_mintGoldValueZero() public {
-        vm.expectRevert(GoldToken.GoldAmountMustBeGreaterThanZero.selector);
+        vm.expectRevert(GoldToken.AmountMustBeGreaterThanZero.selector);
         goldToken.mint{value: 1}();
     }
 
@@ -102,6 +103,12 @@ contract GoldTokenTest is Test {
         goldToken.transfer(address(signers[0]), 1000);
         uint256 balance = goldToken.balanceOf(address(this));
         assertEq(balance, 3875);
+    }
+
+    function test_transferAmountZero() public {
+        goldToken.mint{value: 10000}(); // Receive 5000 GLD
+        vm.expectRevert(GoldToken.AmountMustBeGreaterThanZero.selector);
+        goldToken.transfer(address(signers[0]), 0);
     }
 
     function test_claimEth() public {

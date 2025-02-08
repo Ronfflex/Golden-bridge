@@ -22,8 +22,8 @@ contract GoldToken is Initializable, ERC20PausableUpgradeable, AccessControlUpgr
     mapping(address => uint256) _timestamps;
     address[] _users;
 
-    error MintValueMustBeGreaterThanZero();
-    error GoldAmountMustBeGreaterThanZero();
+    error ValueMustBeGreaterThanZero();
+    error AmountMustBeGreaterThanZero();
 
     event Mint(address indexed to, uint256 amount);
 
@@ -31,7 +31,7 @@ contract GoldToken is Initializable, ERC20PausableUpgradeable, AccessControlUpgr
         _disableInitializers();
     }
 
-    function initialize(address owner, address dataFeedGoldAddress, address dataFeedEthAddress, address lotterieAddress) public initializer {
+    function initialize(address owner, address dataFeedGoldAddress, address dataFeedEthAddress) public initializer {
         __ERC20_init("Gold", "GLD");
         __ERC20Pausable_init();
         __AccessControl_init();
@@ -50,7 +50,6 @@ contract GoldToken is Initializable, ERC20PausableUpgradeable, AccessControlUpgr
 
         _fees = 5; // 5%
         _feesAddress = owner;
-        _lotterieAddress = lotterieAddress;
         _minimumGoldToBlock = 1 ether; // 1 GLD
     }
 
@@ -74,13 +73,13 @@ contract GoldToken is Initializable, ERC20PausableUpgradeable, AccessControlUpgr
 
     function mint() external payable whenNotPaused {
         if (msg.value == 0) {
-            revert MintValueMustBeGreaterThanZero();
+            revert ValueMustBeGreaterThanZero();
         }
 
         int256 goldPriceInEth = _getGoldPriceInEth() * 10 ** 10; // 10**8 + 10**10 = 10**18
         uint256 goldAmount = msg.value * 10 ** 18 / uint256(goldPriceInEth);
         if (goldAmount == 0) {
-            revert GoldAmountMustBeGreaterThanZero();
+            revert AmountMustBeGreaterThanZero();
         }
 
         uint256 fee = goldAmount * _fees / 100;
@@ -88,10 +87,7 @@ contract GoldToken is Initializable, ERC20PausableUpgradeable, AccessControlUpgr
         goldAmount -= fee;
         uint256 lotterieFee = fee / 2;
 
-        if(_timestamps[msg.sender] == 0) {
-            _users.push(msg.sender);
-            _timestamps[msg.sender] = block.timestamp;
-        }
+        addUser(msg.sender);
 
         _mint(msg.sender, goldAmount);
         _mint(_lotterieAddress, lotterieFee);
@@ -108,10 +104,12 @@ contract GoldToken is Initializable, ERC20PausableUpgradeable, AccessControlUpgr
     }
 
     function transfer(address to, uint256 amount) public override returns (bool) {
+        require(amount > 0, AmountMustBeGreaterThanZero());
         _transfer(msg.sender, to, amount);
         if(msg.sender != _lotterieAddress && balanceOf(msg.sender) <= _minimumGoldToBlock) {
             removeUser(msg.sender);
         }
+        addUser(to);
         return true;
     }
 
@@ -123,6 +121,13 @@ contract GoldToken is Initializable, ERC20PausableUpgradeable, AccessControlUpgr
                 _users.pop();
                 break;
             }
+        }
+    }
+
+    function addUser(address user) internal {
+        if(_timestamps[user] == 0) {
+            _users.push(user);
+            _timestamps[user] = block.timestamp;
         }
     }
 
@@ -160,6 +165,10 @@ contract GoldToken is Initializable, ERC20PausableUpgradeable, AccessControlUpgr
     function setFeesAddress(address feesAddress) external onlyRole(OWNER_ROLE) {
         // Lotterie contract
         _feesAddress = feesAddress;
+    }
+
+    function setLotterieAddress(address lotterieAddress) external onlyRole(OWNER_ROLE) {
+        _lotterieAddress = lotterieAddress;
     }
 
     function claimEth() external onlyRole(OWNER_ROLE) {
