@@ -18,7 +18,7 @@ contract LotterieTest is Test {
     Lotterie public lotterie;
     VRFCoordinatorV2Mock public vrfCoordinator;
 
-    function setUp() public{
+    function setUp() public {
         signers = [address(0x1), address(0x2), address(0x3)];
 
         mockGold = new MockV3Aggregator(8, int256(100000000000)); // 100.00 USD
@@ -38,7 +38,17 @@ contract LotterieTest is Test {
         Lotterie implementation2 = new Lotterie(address(vrfCoordinator));
         ERC1967Proxy proxy2 = new ERC1967Proxy(
             address(implementation2),
-            abi.encodeWithSelector(Lotterie.initialize.selector, address(this), subscription, address(vrfCoordinator), bytes32(0xd89b2bf150e3b9e13446986e571fb9cab24b13cea0a43ea20a6049a85cc807cc), 100000, 3, 1, address(goldToken))
+            abi.encodeWithSelector(
+                Lotterie.initialize.selector,
+                address(this),
+                subscription,
+                address(vrfCoordinator),
+                bytes32(0xd89b2bf150e3b9e13446986e571fb9cab24b13cea0a43ea20a6049a85cc807cc),
+                100000,
+                3,
+                1,
+                address(goldToken)
+            )
         );
         lotterie = Lotterie(address(proxy2));
 

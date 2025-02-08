@@ -98,7 +98,7 @@ contract GoldToken is Initializable, ERC20PausableUpgradeable, AccessControlUpgr
 
     function burn(uint256 amount) external whenNotPaused {
         _burn(msg.sender, amount);
-        if(balanceOf(msg.sender) <= _minimumGoldToBlock) {
+        if (balanceOf(msg.sender) <= _minimumGoldToBlock) {
             removeUser(msg.sender);
         }
     }
@@ -106,14 +106,14 @@ contract GoldToken is Initializable, ERC20PausableUpgradeable, AccessControlUpgr
     function transfer(address to, uint256 amount) public override returns (bool) {
         require(amount > 0, AmountMustBeGreaterThanZero());
         _transfer(msg.sender, to, amount);
-        if(msg.sender != _lotterieAddress && balanceOf(msg.sender) <= _minimumGoldToBlock) {
+        if (msg.sender != _lotterieAddress && balanceOf(msg.sender) <= _minimumGoldToBlock) {
             removeUser(msg.sender);
         }
         addUser(to);
         return true;
     }
 
-    function removeUser(address user) internal{
+    function removeUser(address user) internal {
         _timestamps[user] = 0;
         for (uint256 i = 0; i < _users.length; i++) {
             if (_users[i] == user) {
@@ -125,7 +125,7 @@ contract GoldToken is Initializable, ERC20PausableUpgradeable, AccessControlUpgr
     }
 
     function addUser(address user) internal {
-        if(_timestamps[user] == 0) {
+        if (_timestamps[user] == 0) {
             _users.push(user);
             _timestamps[user] = block.timestamp;
         }
