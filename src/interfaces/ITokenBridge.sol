@@ -159,6 +159,8 @@ interface ITokenBridge {
      */
     error FailedToWithdrawEth(address owner, address target, uint256 value);
 
+    error InvalidGasLimit(uint256 gasLimit);
+
     /*//////////////////////////////////////////////////////////////
                             BRIDGE FUNCTIONS
     //////////////////////////////////////////////////////////////*/
@@ -276,20 +278,4 @@ interface ITokenBridge {
      * @return bool True if the sender is whitelisted
      */
     function whitelistedSenders(address sender) external view returns (bool);
-
-    /*//////////////////////////////////////////////////////////////
-                          WITHDRAWAL FUNCTIONS
-    //////////////////////////////////////////////////////////////*/
-    /**
-     * @notice Withdraws all native currency from the contract
-     * @param beneficiary Address to receive the withdrawn currency
-     */
-    function withdraw(address beneficiary) external;
-
-    /**
-     * @notice Withdraws all tokens of a specific type from the contract
-     * @param beneficiary Address to receive the withdrawn tokens
-     * @param token Token contract address to withdraw
-     */
-    function withdrawToken(address beneficiary, address token) external;
 }

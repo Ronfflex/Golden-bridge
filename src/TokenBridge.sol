@@ -184,7 +184,7 @@ contract TokenBridge is CCIPReceiver, OwnerIsCreator, ITokenBridge {
      * Validates message authenticity and handles token transfer
      * @param message The CCIP message containing transfer details
      */
-    function _ccipReceive(Client.Any2EVMMessage memory message) internal override {
+    function _ccipReceive(Client.Any2EVMMessage memory message) internal override onlyRouter {
         if (_paused) revert BridgePausedError();
         if (processedMessages[message.messageId]) {
             revert MessageAlreadyProcessed(message.messageId);
@@ -238,6 +238,7 @@ contract TokenBridge is CCIPReceiver, OwnerIsCreator, ITokenBridge {
      * @inheritdoc ITokenBridge
      */
     function setCCIPGasLimit(uint256 gasLimit) external override onlyOwner {
+        if (gasLimit == 0) revert InvalidGasLimit(gasLimit);
         _ccipGasLimit = gasLimit;
         emit CCIPGasLimitUpdated(gasLimit);
     }
@@ -290,33 +291,5 @@ contract TokenBridge is CCIPReceiver, OwnerIsCreator, ITokenBridge {
      */
     function getGoldTokenBalance() external view override returns (uint256) {
         return IERC20(goldToken).balanceOf(address(this));
-    }
-
-    /*//////////////////////////////////////////////////////////////
-                          WITHDRAWAL FUNCTIONS
-    //////////////////////////////////////////////////////////////*/
-    /// @notice Allows the contract to receive native currency (ETH/BNB)
-    /// @dev Required for receiving native token payments
-    receive() external payable {}
-
-    /**
-     * @inheritdoc ITokenBridge
-     */
-    function withdraw(address beneficiary) external override onlyOwner {
-        uint256 amount = address(this).balance;
-        if (amount == 0) revert InvalidAmount(0);
-
-        (bool sent,) = beneficiary.call{value: amount}("");
-        if (!sent) revert FailedToWithdrawEth(msg.sender, beneficiary, amount);
-    }
-
-    /**
-     * @inheritdoc ITokenBridge
-     */
-    function withdrawToken(address beneficiary, address token) external override onlyOwner {
-        uint256 amount = IERC20(token).balanceOf(address(this));
-        if (amount == 0) revert InvalidAmount(0);
-
-        IERC20(token).safeTransfer(beneficiary, amount);
     }
 }
