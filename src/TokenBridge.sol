@@ -6,70 +6,97 @@ import {Client} from "@chainlink/contracts-ccip/src/v0.8/ccip/libraries/Client.s
 import {CCIPReceiver} from "@chainlink/contracts-ccip/src/v0.8/ccip/applications/CCIPReceiver.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
+import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {OwnerIsCreator} from "@chainlink/contracts-ccip/src/v0.8/shared/access/OwnerIsCreator.sol";
 import {ITokenBridge} from "./interfaces/ITokenBridge.sol";
 
 /**
  * @title TokenBridge
- * @notice A cross-chain bridge implementation for GoldToken using Chainlink's CCIP
- * @dev This contract enables secure token transfers between Ethereum and BSC networks.
- * Key features:
- * - Uses Chainlink's CCIP for secure cross-chain messaging
- * - Supports both LINK and native token (ETH/BNB) for fee payments
- * - Includes whitelist controls for chains and senders
- * - Implements pausable functionality for emergency stops
- * @custom:security-contact security@goldbridge.com
+ * @notice Cross-chain bridge for GoldToken using Chainlink's CCIP protocol
+ * @dev Implements a secure bridge between Ethereum and BSC networks using Chainlink's CCIP.
+ *      This contract handles:
+ *      - Cross-chain token transfers with both LINK and native token fee payments
+ *      - Message verification and processing
+ *      - Chain and sender whitelisting
+ *      - Emergency pause functionality
+ *      - Security features including reentrancy protection
  */
-contract TokenBridge is CCIPReceiver, OwnerIsCreator, ITokenBridge {
+contract TokenBridge is CCIPReceiver, OwnerIsCreator, Pausable, ReentrancyGuard, ITokenBridge {
     using SafeERC20 for IERC20;
+
+    /*//////////////////////////////////////////////////////////////
+                                STRUCTS
+    //////////////////////////////////////////////////////////////*/
+
+    /**
+     * @dev Stores configuration details for each supported chain
+     * @param isEnabled Whether the chain is currently whitelisted
+     * @param ccipExtraArgs Extra arguments for CCIP message configuration
+     */
+    struct ChainDetails {
+        bool isEnabled;
+        bytes ccipExtraArgs;
+    }
 
     /*//////////////////////////////////////////////////////////////
                             STATE VARIABLES
     //////////////////////////////////////////////////////////////*/
-    /// @notice Chain selector for the destination chain (BSC)
-    /// @dev Immutable value set at deployment, cannot be changed
+
+    /// @notice Chain selector for the authorized destination chain (BSC)
+    /// @dev Immutable value set during deployment
     uint64 public immutable override destinationChainSelector;
 
-    /// @notice Address of the GoldToken contract
-    /// @dev Immutable value set at deployment, cannot be changed
+    /// @notice Contract address of the GoldToken being bridged
+    /// @dev Immutable value set during deployment
     address public immutable override goldToken;
 
-    /// @notice Address of the LINK token used for fees
-    /// @dev Immutable value set at deployment, cannot be changed
+    /// @notice Contract address of LINK token used for fee payments
+    /// @dev Immutable value set during deployment
     address public immutable override link;
 
-    /// @notice Mapping to track processed CCIP messages to prevent duplicates
-    /// @dev Maps messageId to processing status
+    /// @notice Tracks processed CCIP messages to prevent duplicates
+    /// @dev Maps messageId => processed status
     mapping(bytes32 => bool) public override processedMessages;
 
-    /// @notice Mapping of whitelisted chains that can interact with this contract
-    /// @dev Maps chain selector to whitelist status
-    mapping(uint64 => bool) public override whitelistedChains;
+    /// @notice Stores configuration for each supported chain
+    /// @dev Maps chainSelector => ChainDetails
+    mapping(uint64 => ChainDetails) private _chainDetails;
 
-    /// @notice Mapping of whitelisted sender addresses on other chains
-    /// @dev Maps sender address to whitelist status
+    /// @notice Tracks authorized cross-chain senders
+    /// @dev Maps sender address => authorization status
     mapping(address => bool) public override whitelistedSenders;
 
     /// @notice Gas limit for cross-chain operations
-    /// @dev Can be modified by owner to adapt to network conditions
+    /// @dev Default value 200,000, can be updated by owner
     uint256 private _ccipGasLimit;
 
-    /// @notice Flag to allow out-of-order message execution
-    /// @dev Controls whether messages must be processed in sequence
-    bool private _allowOutOfOrderExecution;
-
-    /// @notice Flag indicating if the bridge is paused
-    /// @dev Used for emergency stops
-    bool private _paused;
+    /*//////////////////////////////////////////////////////////////
+                               MODIFIERS
+    //////////////////////////////////////////////////////////////*/
 
     /**
-     * @notice Initializes the bridge contract
-     * @dev Sets up initial configuration including whitelisting the destination chain
-     * All parameters must be non-zero addresses to prevent configuration errors
-     * @param _router The address of the CCIP router contract
-     * @param _link The address of the LINK token contract
-     * @param _goldToken The address of the GoldToken contract
-     * @param _destinationChainSelector The chain selector for the destination chain (BSC)
+     * @dev Ensures operations only proceed with whitelisted chains
+     * @param chainSelector The chain selector to verify
+     */
+    modifier onlyEnabledChain(uint64 chainSelector) {
+        if (!_chainDetails[chainSelector].isEnabled) {
+            revert ChainNotWhitelisted(chainSelector);
+        }
+        _;
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                             CONSTRUCTOR
+    //////////////////////////////////////////////////////////////*/
+
+    /**
+     * @notice Initializes the bridge with router, token addresses, and destination chain
+     * @dev Sets up initial chain configuration with default parameters
+     * @param _router Address of the CCIP router contract
+     * @param _link Address of the LINK token contract
+     * @param _goldToken Address of the GoldToken contract
+     * @param _destinationChainSelector Selector for the destination chain
      */
     constructor(address _router, address _link, address _goldToken, uint64 _destinationChainSelector)
         CCIPReceiver(_router)
@@ -82,54 +109,50 @@ contract TokenBridge is CCIPReceiver, OwnerIsCreator, ITokenBridge {
         goldToken = _goldToken;
         destinationChainSelector = _destinationChainSelector;
 
-        whitelistedChains[_destinationChainSelector] = true;
-        emit ChainWhitelisted(_destinationChainSelector);
+        _chainDetails[_destinationChainSelector] = ChainDetails({
+            isEnabled: true,
+            ccipExtraArgs: Client._argsToBytes(Client.EVMExtraArgsV2({gasLimit: 200_000, allowOutOfOrderExecution: true}))
+        });
 
-        _ccipGasLimit = 200_000; // Default gas limit
-        _allowOutOfOrderExecution = true; // Default to allow out of order execution
+        emit ChainWhitelisted(_destinationChainSelector);
     }
 
     /*//////////////////////////////////////////////////////////////
                             BRIDGE FUNCTIONS
     //////////////////////////////////////////////////////////////*/
-    /**
-     * @inheritdoc ITokenBridge
-     */
-    function bridgeTokensPayLink(address receiver, uint256 amount) external override returns (bytes32 messageId) {
-        return _bridgeTokens(receiver, amount, link);
-    }
 
     /**
-     * @inheritdoc ITokenBridge
+     * @notice Bridges tokens to the destination chain
+     * @dev Handles both LINK and native token fee payments
+     * @param receiver Address receiving tokens on destination chain
+     * @param amount Amount of tokens to bridge
+     * @param payFeesIn Specifies fee payment method (LINK or native)
+     * @return messageId Unique identifier for the bridge transaction
      */
-    function bridgeTokensPayNative(address receiver, uint256 amount)
+    function bridgeTokens(address receiver, uint256 amount, PayFeesIn payFeesIn)
         external
         payable
-        override
+        nonReentrant
+        whenNotPaused
         returns (bytes32 messageId)
     {
-        return _bridgeTokens(receiver, amount, address(0));
+        address feeToken = payFeesIn == PayFeesIn.LINK ? link : address(0);
+        return _bridgeTokens(receiver, amount, feeToken);
     }
 
     /**
-     * @notice Internal implementation of token bridging logic
-     * @dev Handles token transfer and CCIP message creation
-     * Steps:
-     * 1. Validates inputs and contract state
-     * 2. Transfers tokens from sender to bridge
-     * 3. Creates and sends CCIP message
-     * 4. Handles fee payment (LINK or native)
-     * @param receiver The address that will receive tokens
-     * @param amount The amount of tokens to bridge
-     * @param feeToken The token used to pay CCIP fees (LINK or native token)
-     * @return messageId The unique identifier for this bridge transaction
+     * @dev Internal function to handle token bridging logic
+     * @param receiver Address receiving the tokens
+     * @param amount Amount of tokens to bridge
+     * @param feeToken Token used for fee payment (LINK or native)
+     * @return messageId Unique identifier for the transaction
      */
-    function _bridgeTokens(address receiver, uint256 amount, address feeToken) internal returns (bytes32 messageId) {
-        if (_paused) revert BridgePausedError();
+    function _bridgeTokens(address receiver, uint256 amount, address feeToken)
+        internal
+        onlyEnabledChain(destinationChainSelector)
+        returns (bytes32 messageId)
+    {
         if (amount == 0) revert InvalidAmount(amount);
-        if (!whitelistedChains[destinationChainSelector]) {
-            revert ChainNotWhitelisted(destinationChainSelector);
-        }
 
         IERC20(goldToken).safeTransferFrom(msg.sender, address(this), amount);
 
@@ -154,13 +177,11 @@ contract TokenBridge is CCIPReceiver, OwnerIsCreator, ITokenBridge {
     }
 
     /**
-     * @notice Builds CCIP message for cross-chain communication
-     * @dev Creates an EVM2AnyMessage struct with necessary parameters
-     * Uses configured gas limit and out-of-order execution settings
-     * @param receiver The address that will receive tokens
-     * @param amount The amount of tokens being transferred
-     * @param feeToken The token used for paying fees
-     * @return Client.EVM2AnyMessage The constructed CCIP message
+     * @dev Builds the CCIP message for cross-chain communication
+     * @param receiver Address receiving the tokens
+     * @param amount Amount of tokens being transferred
+     * @param feeToken Token used for fee payment
+     * @return CCIP message structure
      */
     function _buildCCIPMessage(address receiver, uint256 amount, address feeToken)
         internal
@@ -171,25 +192,21 @@ contract TokenBridge is CCIPReceiver, OwnerIsCreator, ITokenBridge {
             receiver: abi.encode(receiver),
             data: abi.encode(amount),
             tokenAmounts: new Client.EVMTokenAmount[](0),
-            extraArgs: Client._argsToBytes(
-                Client.EVMExtraArgsV2({gasLimit: _ccipGasLimit, allowOutOfOrderExecution: _allowOutOfOrderExecution})
-            ),
+            extraArgs: _chainDetails[destinationChainSelector].ccipExtraArgs,
             feeToken: feeToken
         });
     }
 
     /**
      * @notice Processes incoming CCIP messages
-     * @dev Implements CCIPReceiver's _ccipReceive
-     * Validates message authenticity and handles token transfer
-     * @param message The CCIP message containing transfer details
+     * @dev Handles message verification and token distribution
+     * @param message The incoming CCIP message
      */
-    function _ccipReceive(Client.Any2EVMMessage memory message) internal override onlyRouter {
-        if (_paused) revert BridgePausedError();
+    function _ccipReceive(Client.Any2EVMMessage memory message) internal override whenNotPaused nonReentrant {
         if (processedMessages[message.messageId]) {
             revert MessageAlreadyProcessed(message.messageId);
         }
-        if (!whitelistedChains[message.sourceChainSelector]) {
+        if (!_chainDetails[message.sourceChainSelector].isEnabled) {
             revert ChainNotWhitelisted(message.sourceChainSelector);
         }
 
@@ -209,11 +226,23 @@ contract TokenBridge is CCIPReceiver, OwnerIsCreator, ITokenBridge {
     /*//////////////////////////////////////////////////////////////
                             ADMIN FUNCTIONS
     //////////////////////////////////////////////////////////////*/
+
     /**
-     * @inheritdoc ITokenBridge
+     * @notice Updates chain whitelist status and configuration
+     * @dev Sets chain status and CCIP message parameters
+     * @param chainSelector The chain selector to update
+     * @param enabled Whether to enable or disable the chain
+     * @param ccipExtraArgs CCIP message configuration for the chain
      */
-    function setWhitelistedChain(uint64 chainSelector, bool enabled) external override onlyOwner {
-        whitelistedChains[chainSelector] = enabled;
+    function setWhitelistedChain(uint64 chainSelector, bool enabled, bytes memory ccipExtraArgs)
+        external
+        override
+        onlyOwner
+    {
+        if (chainSelector == 0) revert InvalidChainSelector(chainSelector);
+
+        _chainDetails[chainSelector] = ChainDetails({isEnabled: enabled, ccipExtraArgs: ccipExtraArgs});
+
         if (enabled) {
             emit ChainWhitelisted(chainSelector);
         } else {
@@ -222,7 +251,9 @@ contract TokenBridge is CCIPReceiver, OwnerIsCreator, ITokenBridge {
     }
 
     /**
-     * @inheritdoc ITokenBridge
+     * @notice Updates sender whitelist status
+     * @param sender The sender address to update
+     * @param enabled Whether to enable or disable the sender
      */
     function setWhitelistedSender(address sender, bool enabled) external override onlyOwner {
         if (sender == address(0)) revert InvalidSender(sender);
@@ -235,59 +266,76 @@ contract TokenBridge is CCIPReceiver, OwnerIsCreator, ITokenBridge {
     }
 
     /**
-     * @inheritdoc ITokenBridge
+     * @notice Pauses bridge operations
+     * @dev Can only be called by the owner
      */
-    function setCCIPGasLimit(uint256 gasLimit) external override onlyOwner {
-        if (gasLimit == 0) revert InvalidGasLimit(gasLimit);
-        _ccipGasLimit = gasLimit;
-        emit CCIPGasLimitUpdated(gasLimit);
+    function pause() external onlyOwner {
+        _pause();
     }
 
     /**
-     * @inheritdoc ITokenBridge
+     * @notice Unpauses bridge operations
+     * @dev Can only be called by the owner
      */
-    function setAllowOutOfOrderExecution(bool allow) external override onlyOwner {
-        _allowOutOfOrderExecution = allow;
-        emit OutOfOrderExecutionUpdated(allow);
+    function unpause() external onlyOwner {
+        _unpause();
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                            WITHDRAW FUNCTIONS
+    //////////////////////////////////////////////////////////////*/
+
+    /// @notice Allows the contract to receive native tokens
+    receive() external payable {}
+
+    /**
+     * @notice Withdraws native tokens from the contract
+     * @param beneficiary Address to receive the withdrawn tokens
+     */
+    function withdraw(address beneficiary) external override onlyOwner nonReentrant {
+        uint256 amount = address(this).balance;
+        if (amount == 0) revert InvalidAmount(0);
+
+        (bool sent,) = beneficiary.call{value: amount}("");
+        if (!sent) revert FailedToWithdrawEth(msg.sender, beneficiary, amount);
     }
 
     /**
-     * @inheritdoc ITokenBridge
+     * @notice Withdraws ERC20 tokens from the contract
+     * @param beneficiary Address to receive the withdrawn tokens
+     * @param token Address of the token to withdraw
      */
-    function pauseBridge() external override onlyOwner {
-        if (_paused) revert BridgeNotPausedError();
-        _paused = true;
-        emit BridgePausedEvent();
-    }
+    function withdrawToken(address beneficiary, address token) external override onlyOwner nonReentrant {
+        uint256 amount = IERC20(token).balanceOf(address(this));
+        if (amount == 0) revert InvalidAmount(0);
 
-    /**
-     * @inheritdoc ITokenBridge
-     */
-    function unpauseBridge() external override onlyOwner {
-        if (!_paused) revert BridgePausedError();
-        _paused = false;
-        emit BridgeUnpausedEvent();
+        IERC20(token).safeTransfer(beneficiary, amount);
     }
 
     /*//////////////////////////////////////////////////////////////
                              VIEW FUNCTIONS
     //////////////////////////////////////////////////////////////*/
+
     /**
-     * @inheritdoc ITokenBridge
+     * @notice Checks if a chain is whitelisted
+     * @param chainSelector The chain selector to check
+     * @return bool True if the chain is whitelisted
      */
-    function isPaused() external view override returns (bool) {
-        return _paused;
+    function whitelistedChains(uint64 chainSelector) external view override returns (bool) {
+        return _chainDetails[chainSelector].isEnabled;
     }
 
     /**
-     * @inheritdoc ITokenBridge
+     * @notice Gets the contract's LINK token balance
+     * @return uint256 The contract's LINK token balance
      */
     function getLinkBalance() external view override returns (uint256) {
         return IERC20(link).balanceOf(address(this));
     }
 
     /**
-     * @inheritdoc ITokenBridge
+     * @notice Gets the contract's GoldToken balance
+     * @return uint256 The contract's GoldToken balance
      */
     function getGoldTokenBalance() external view override returns (uint256) {
         return IERC20(goldToken).balanceOf(address(this));
