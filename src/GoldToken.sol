@@ -18,9 +18,9 @@ contract GoldToken is Initializable, ERC20PausableUpgradeable, AccessControlUpgr
     address internal _feesAddress;
     address internal _lotterieAddress;
 
-    uint256 _minimumGoldToBlock;
-    mapping(address => uint256) _timestamps;
-    address[] _users;
+    uint256 internal _minimumGoldToBlock;
+    mapping(address => uint256) internal _timestamps;
+    address[] internal _users;
 
     error ValueMustBeGreaterThanZero();
     error AmountMustBeGreaterThanZero();
@@ -105,11 +105,11 @@ contract GoldToken is Initializable, ERC20PausableUpgradeable, AccessControlUpgr
 
     function transfer(address to, uint256 amount) public override returns (bool) {
         require(amount > 0, AmountMustBeGreaterThanZero());
-        _transfer(msg.sender, to, amount);
         if(msg.sender != _lotterieAddress && balanceOf(msg.sender) <= _minimumGoldToBlock) {
             removeUser(msg.sender);
         }
         addUser(to);
+        _transfer(msg.sender, to, amount);
         return true;
     }
 
