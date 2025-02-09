@@ -20,10 +20,12 @@ contract GoldTokenTest is Test {
         assembly {
             id := chainid()
         }
-        if (id == 31337) { // Local network
+        if (id == 31337) {
+            // Local network
             goldAggregator = new MockV3Aggregator(8, int256(100000000000)); // 100.00 USD
             ethAggregator = new MockV3Aggregator(8, int256(50000000000)); // 50.00 USD
-        } else { // Mainnet fork
+        } else {
+            // Mainnet fork
             goldAggregator = MockV3Aggregator(0x214eD9Da11D2fbe465a6fc601a91E62EbEc1a0D6); // gold / USD
             ethAggregator = MockV3Aggregator(0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419); // ETH / USD
         }
@@ -34,7 +36,9 @@ contract GoldTokenTest is Test {
         GoldToken implementation = new GoldToken();
         ERC1967Proxy proxy = new ERC1967Proxy(
             address(implementation),
-            abi.encodeWithSelector(GoldToken.initialize.selector, address(this), address(goldAggregator), address(ethAggregator))
+            abi.encodeWithSelector(
+                GoldToken.initialize.selector, address(this), address(goldAggregator), address(ethAggregator)
+            )
         );
         goldToken = GoldToken(address(proxy));
         goldToken.setLotterieAddress(address(10));

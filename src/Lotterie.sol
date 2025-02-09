@@ -10,7 +10,6 @@ import "./interfaces/IGoldToken.sol";
 
 contract Lotterie is Initializable, AccessControlUpgradeable, UUPSUpgradeable, VRFConsumerBaseV2Plus {
     bytes32 public constant OWNER_ROLE = keccak256("OWNER_ROLE");
-    
     uint256 internal _s_subscriptionId;
     address internal _vrfCoordinator;
     bytes32 internal _s_keyHash;
@@ -26,22 +25,32 @@ contract Lotterie is Initializable, AccessControlUpgradeable, UUPSUpgradeable, V
     mapping (uint256 => address) internal _results;
     mapping (address => uint256) internal _gains;
 
+
     error OneRandomDrawPerMounth();
 
     event RandomDrawed(uint256 requestId);
     event Winner(address winner);
 
-    constructor(address vrfCoordinator) VRFConsumerBaseV2Plus(vrfCoordinator)  {
+    constructor(address vrfCoordinator) VRFConsumerBaseV2Plus(vrfCoordinator) {
         _disableInitializers();
     }
 
-    function initialize(address owner, uint256 subscriptionId, address vrfCoordinator, bytes32 keyHash, uint32 callbackGasLimit, uint16 requestConfirmations, uint32 numWords,  address goldToken) public initializer {
+    function initialize(
+        address owner,
+        uint256 subscriptionId,
+        address vrfCoordinator,
+        bytes32 keyHash,
+        uint32 callbackGasLimit,
+        uint16 requestConfirmations,
+        uint32 numWords,
+        address goldToken
+    ) public initializer {
         __AccessControl_init();
         __UUPSUpgradeable_init();
 
         _grantRole(OWNER_ROLE, owner);
         _setRoleAdmin(OWNER_ROLE, OWNER_ROLE);
-        
+
         _s_subscriptionId = subscriptionId;
 
         _vrfCoordinator = vrfCoordinator; // 0x9DdfaCa8183c41ad55329BdeeD9F6A8d53168B1B
@@ -68,7 +77,7 @@ contract Lotterie is Initializable, AccessControlUpgradeable, UUPSUpgradeable, V
         // One randomdraw per mounth
         require(_lastRandomDraw + 30 days <= block.timestamp, OneRandomDrawPerMounth());
 
-       requestId = s_vrfCoordinator.requestRandomWords(
+        requestId = s_vrfCoordinator.requestRandomWords(
             VRFV2PlusClient.RandomWordsRequest({
                 keyHash: _s_keyHash,
                 subId: _s_subscriptionId,
@@ -86,7 +95,6 @@ contract Lotterie is Initializable, AccessControlUpgradeable, UUPSUpgradeable, V
     }
 
     function fulfillRandomWords(uint256 requestId, uint256[] calldata randomWords) internal override {
-
         // transform the result to a number between 0 and number of participants
         address[] memory users = _goldToken.getUsers();
         uint256 index = (randomWords[0] % users.length);

@@ -18,7 +18,7 @@ contract LotterieTest is Test {
     Lotterie public lotterie;
     VRFCoordinatorV2_5Mock public vrfCoordinator;
 
-    function setUp() public{
+    function setUp() public {
         signers = [address(0x1), address(0x2), address(0x3)];
 
         mockGold = new MockV3Aggregator(8, int256(100000000000)); // 100.00 USD
