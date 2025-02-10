@@ -1,66 +1,45 @@
-## Foundry
+# Golden Bridge
 
-**Foundry is a blazing fast, portable and modular toolkit for Ethereum application development written in Rust.**
+This ERC-20 token is backed to gold, with 1 token representing 1 gram of gold. Users mint tokens by sending ETH, using Chainlink Price Feeds for real-time pricing.
 
-Foundry consists of:
+A 5% fee applies to mint and burn transactions, with 50% allocated to a lottery using Chainlink VRF for fairness. The token is also bridged between Ethereum and Binance Smart Chain (BSC) via Chainlink CCIP, ensuring seamless cross-chain transfers while the main implementation remains on Ethereum.
+## Authors
 
--   **Forge**: Ethereum testing framework (like Truffle, Hardhat and DappTools).
--   **Cast**: Swiss army knife for interacting with EVM smart contracts, sending transactions and getting chain data.
--   **Anvil**: Local Ethereum node, akin to Ganache, Hardhat Network.
--   **Chisel**: Fast, utilitarian, and verbose solidity REPL.
+- [@Coralie Boyer](https://github.com/coralieBo)
+- [@Vincent Rainaud](https://github.com/Ronfflex)
 
-## Documentation
+## Installation
 
-https://book.getfoundry.sh/
+### Clone this repos with
 
-## Usage
-
-### Build
-
-```shell
-$ forge build
+```bash
+git clone https://github.com/Ronfflex/Golden-bridge.git
 ```
 
-### Test
+## Build
 
-```shell
-$ forge test
+### Build the code with
+
+```bash
+forge build
+```
+## Run 
+
+### Run the tests with
+
+```bash
+forge test
 ```
 
-### Format
 
-```shell
-$ forge fmt
+### Check the coverage with
+
+```bash
+forge coverage
 ```
 
-### Gas Snapshots
+### Run the scripts with
 
-```shell
-$ forge snapshot
-```
+```bash
 
-### Anvil
-
-```shell
-$ anvil
-```
-
-### Deploy
-
-```shell
-$ forge script script/Counter.s.sol:CounterScript --rpc-url <your_rpc_url> --private-key <your_private_key>
-```
-
-### Cast
-
-```shell
-$ cast <subcommand>
-```
-
-### Help
-
-```shell
-$ forge --help
-$ anvil --help
-$ cast --help
 ```
