@@ -131,6 +131,36 @@ contract TokenBridgeTest is Test {
         tokenBridge.initialize(owner, address(linkToken), address(goldToken), BSC_CHAIN_SELECTOR);
     }
 
+    function test_cannotInitializeWithZeroAddresses() public {
+        TokenBridge implementation = new TokenBridge(address(router));
+
+        // Test with zero LINK address
+        vm.expectRevert(abi.encodeWithSelector(ITokenBridge.InvalidSender.selector, address(0)));
+        new ERC1967Proxy(
+            address(implementation),
+            abi.encodeWithSelector(
+                TokenBridge.initialize.selector,
+                owner,
+                address(0), // zero LINK address
+                address(goldToken),
+                BSC_CHAIN_SELECTOR
+            )
+        );
+
+        // Test with zero GoldToken address
+        vm.expectRevert(abi.encodeWithSelector(ITokenBridge.InvalidSender.selector, address(0)));
+        new ERC1967Proxy(
+            address(implementation),
+            abi.encodeWithSelector(
+                TokenBridge.initialize.selector,
+                owner,
+                address(linkToken),
+                address(0), // zero GoldToken address
+                BSC_CHAIN_SELECTOR
+            )
+        );
+    }
+
     /*//////////////////////////////////////////////////////////////
                               ACCESS TESTS
     //////////////////////////////////////////////////////////////*/
@@ -185,6 +215,11 @@ contract TokenBridgeTest is Test {
 
         // Verify state changes
         assertEq(goldToken.balanceOf(address(tokenBridge)), amount);
+    }
+
+    function test_cannotBridgeZeroAmount() public {
+        vm.expectRevert(abi.encodeWithSelector(ITokenBridge.InvalidAmount.selector, 0));
+        tokenBridge.bridgeTokens(signers[0], 0, ITokenBridge.PayFeesIn.LINK);
     }
 
     function test_cannotBridgeWhenPaused() public {
@@ -242,6 +277,79 @@ contract TokenBridgeTest is Test {
         vm.stopPrank();
     }
 
+    function test_cannotReceiveFromUnwhitelistedChain() public {
+        _setupTokens();
+        uint64 unwhitelistedChainSelector = 999;
+
+        // Create a message from an unwhitelisted chain
+        Client.Any2EVMMessage memory message = Client.Any2EVMMessage({
+            messageId: bytes32(uint256(1)),
+            sourceChainSelector: unwhitelistedChainSelector, // Using unwhitelisted chain
+            sender: abi.encode(address(this)),
+            data: abi.encode(signers[0], 1 ether),
+            destTokenAmounts: new Client.EVMTokenAmount[](0)
+        });
+
+        // Try to receive the message
+        vm.prank(address(router));
+        vm.expectRevert(abi.encodeWithSelector(ITokenBridge.ChainNotWhitelisted.selector, unwhitelistedChainSelector));
+        tokenBridge.ccipReceive(message);
+    }
+
+    function test_cannotReceiveFromUnwhitelistedSender() public {
+        _setupTokens();
+        address unwhitelistedSender = address(0xbad);
+
+        // Create a message from an unwhitelisted sender
+        Client.Any2EVMMessage memory message = Client.Any2EVMMessage({
+            messageId: bytes32(uint256(1)),
+            sourceChainSelector: BSC_CHAIN_SELECTOR,
+            sender: abi.encode(unwhitelistedSender), // Using unwhitelisted sender
+            data: abi.encode(signers[0], 1 ether),
+            destTokenAmounts: new Client.EVMTokenAmount[](0)
+        });
+
+        // Try to receive the message
+        vm.prank(address(router));
+        vm.expectRevert(abi.encodeWithSelector(ITokenBridge.SenderNotWhitelisted.selector, unwhitelistedSender));
+        tokenBridge.ccipReceive(message);
+    }
+
+    function test_cannotReceiveZeroAmount() public {
+        _setupTokens();
+
+        // Create a message with zero amount
+        Client.Any2EVMMessage memory message = Client.Any2EVMMessage({
+            messageId: bytes32(uint256(1)),
+            sourceChainSelector: BSC_CHAIN_SELECTOR,
+            sender: abi.encode(address(this)),
+            data: abi.encode(signers[0], 0), // Zero amount
+            destTokenAmounts: new Client.EVMTokenAmount[](0)
+        });
+
+        // Try to receive the message
+        vm.prank(address(router));
+        vm.expectRevert(abi.encodeWithSelector(ITokenBridge.InvalidAmount.selector, 0));
+        tokenBridge.ccipReceive(message);
+    }
+
+    function test_cannotReceiveWhenPaused() public {
+        _setupTokens();
+        tokenBridge.pause();
+
+        Client.Any2EVMMessage memory message = Client.Any2EVMMessage({
+            messageId: bytes32(uint256(1)),
+            sourceChainSelector: BSC_CHAIN_SELECTOR,
+            sender: abi.encode(address(this)),
+            data: abi.encode(signers[0], 1 ether),
+            destTokenAmounts: new Client.EVMTokenAmount[](0)
+        });
+
+        vm.prank(address(router));
+        vm.expectRevert(PausableUpgradeable.EnforcedPause.selector);
+        tokenBridge.ccipReceive(message);
+    }
+
     /*//////////////////////////////////////////////////////////////
                           ADMIN FUNCTION TESTS
     //////////////////////////////////////////////////////////////*/
@@ -278,6 +386,16 @@ contract TokenBridgeTest is Test {
         assertFalse(tokenBridge.whitelistedSenders(newSender));
     }
 
+    function test_cannotSetZeroChainSelector() public {
+        vm.expectRevert(abi.encodeWithSelector(ITokenBridge.InvalidChainSelector.selector, 0));
+        tokenBridge.setWhitelistedChain(0, true, "");
+    }
+
+    function test_cannotSetZeroAddressSender() public {
+        vm.expectRevert(abi.encodeWithSelector(ITokenBridge.InvalidSender.selector, address(0)));
+        tokenBridge.setWhitelistedSender(address(0), true);
+    }
+
     /*//////////////////////////////////////////////////////////////
                           WITHDRAWAL TESTS
     //////////////////////////////////////////////////////////////*/
@@ -300,6 +418,40 @@ contract TokenBridgeTest is Test {
 
         assertEq(linkToken.balanceOf(address(tokenBridge)), 0);
         assertEq(linkToken.balanceOf(address(this)), initialBalance + bridgeBalance);
+    }
+
+    function test_cannotWithdrawZeroAmount() public {
+        // Empty the bridge's balance first
+        address(tokenBridge).balance;
+        vm.prank(owner);
+        tokenBridge.withdraw(payable(owner));
+
+        // Try to withdraw again
+        vm.expectRevert(abi.encodeWithSelector(ITokenBridge.InvalidAmount.selector, 0));
+        tokenBridge.withdraw(payable(owner));
+    }
+
+    function test_cannotWithdrawTokenZeroAmount() public {
+        // Empty the bridge's token balance first
+        tokenBridge.withdrawToken(address(this), address(linkToken));
+
+        // Try to withdraw again
+        vm.expectRevert(abi.encodeWithSelector(ITokenBridge.InvalidAmount.selector, 0));
+        tokenBridge.withdrawToken(address(this), address(linkToken));
+    }
+
+    function test_failedEthWithdrawal() public {
+        // Create a contract that rejects ETH
+        ContractThatRejectsEth rejectingContract = new ContractThatRejectsEth();
+
+        vm.deal(address(tokenBridge), 1 ether);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                ITokenBridge.FailedToWithdrawEth.selector, address(this), address(rejectingContract), 1 ether
+            )
+        );
+        tokenBridge.withdraw(address(rejectingContract));
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -325,5 +477,36 @@ contract TokenBridgeTest is Test {
         UUPSUpgradeable(address(tokenBridge)).upgradeToAndCall(address(newImplementation), "");
     }
 
+    /*//////////////////////////////////////////////////////////////
+                            GETTER TESTS
+    //////////////////////////////////////////////////////////////*/
+
+    function test_getBalances() public view {
+        // Test getLinkBalance
+        uint256 expectedLinkBalance = linkToken.balanceOf(address(tokenBridge));
+        assertEq(tokenBridge.getLinkBalance(), expectedLinkBalance);
+
+        // Test getGoldTokenBalance
+        uint256 expectedGoldBalance = goldToken.balanceOf(address(tokenBridge));
+        assertEq(tokenBridge.getGoldTokenBalance(), expectedGoldBalance);
+    }
+
+    function test_supportsInterface() public view {
+        // IAccessControl interface id
+        bytes4 accessControlInterfaceId = 0x7965db0b;
+        assertTrue(tokenBridge.supportsInterface(accessControlInterfaceId));
+
+        // Test a random interface id that we don't support
+        bytes4 randomInterfaceId = 0x12345678;
+        assertFalse(tokenBridge.supportsInterface(randomInterfaceId));
+    }
+
     receive() external payable {}
+}
+
+// Contract that rejects ETH for test_failedEthWithdrawal
+contract ContractThatRejectsEth {
+    receive() external payable {
+        revert("I reject ETH");
+    }
 }

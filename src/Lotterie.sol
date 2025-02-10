@@ -22,9 +22,8 @@ contract Lotterie is Initializable, AccessControlUpgradeable, UUPSUpgradeable, V
 
     uint256 internal _lastRandomDraw;
     uint256[] internal _requestIds;
-    mapping (uint256 => address) internal _results;
-    mapping (address => uint256) internal _gains;
-
+    mapping(uint256 => address) internal _results;
+    mapping(address => uint256) internal _gains;
 
     error OneRandomDrawPerMounth();
 
@@ -118,7 +117,7 @@ contract Lotterie is Initializable, AccessControlUpgradeable, UUPSUpgradeable, V
     }
 
     function getLastRequestId() external view returns (uint256) {
-        if(_requestIds.length == 0) {
+        if (_requestIds.length == 0) {
             return 0;
         }
         return _requestIds[_requestIds.length - 1];
@@ -187,5 +186,4 @@ contract Lotterie is Initializable, AccessControlUpgradeable, UUPSUpgradeable, V
     function setGoldToken(address goldToken) external onlyRole(OWNER_ROLE) {
         _goldToken = IGoldToken(goldToken);
     }
-
 }

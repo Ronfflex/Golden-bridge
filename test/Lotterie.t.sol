@@ -38,7 +38,17 @@ contract LotterieTest is Test {
         Lotterie implementation2 = new Lotterie(address(vrfCoordinator));
         ERC1967Proxy proxy2 = new ERC1967Proxy(
             address(implementation2),
-            abi.encodeWithSelector(Lotterie.initialize.selector, address(this), subscription, address(vrfCoordinator), bytes32(0x787d74caea10b2b357790d5b5247c2f63d1d91572a9846f780606e4d953677ae), 100000, 3, 1, address(goldToken))
+            abi.encodeWithSelector(
+                Lotterie.initialize.selector,
+                address(this),
+                subscription,
+                address(vrfCoordinator),
+                bytes32(0x787d74caea10b2b357790d5b5247c2f63d1d91572a9846f780606e4d953677ae),
+                100000,
+                3,
+                1,
+                address(goldToken)
+            )
         );
         lotterie = Lotterie(address(proxy2));
 

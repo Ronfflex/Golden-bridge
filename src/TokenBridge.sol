@@ -24,14 +24,14 @@ import {ITokenBridge} from "./interfaces/ITokenBridge.sol";
  *      - Emergency pause functionality
  *      - Security features including reentrancy protection
  */
-contract TokenBridge is 
+contract TokenBridge is
     Initializable,
     CCIPReceiver,
     AccessControlUpgradeable,
     PausableUpgradeable,
     ReentrancyGuardUpgradeable,
     UUPSUpgradeable,
-    ITokenBridge 
+    ITokenBridge
 {
     using SafeERC20 for IERC20;
 
@@ -109,12 +109,10 @@ contract TokenBridge is
      * @param _goldToken Address of the GoldToken contract
      * @param _destinationChainSelector Selector for the destination chain
      */
-    function initialize(
-        address owner,
-        address _link,
-        address _goldToken,
-        uint64 _destinationChainSelector
-    ) public initializer {
+    function initialize(address owner, address _link, address _goldToken, uint64 _destinationChainSelector)
+        public
+        initializer
+    {
         __AccessControl_init();
         __Pausable_init();
         __ReentrancyGuard_init();
@@ -123,7 +121,7 @@ contract TokenBridge is
         if (_link == address(0) || _goldToken == address(0)) {
             revert InvalidSender(address(0));
         }
-        
+
         _grantRole(OWNER_ROLE, owner);
         _setRoleAdmin(OWNER_ROLE, OWNER_ROLE);
 
@@ -133,12 +131,7 @@ contract TokenBridge is
 
         _chainDetails[_destinationChainSelector] = ChainDetails({
             isEnabled: true,
-            ccipExtraArgs: Client._argsToBytes(
-                Client.EVMExtraArgsV2({
-                    gasLimit: 200_000,
-                    allowOutOfOrderExecution: true
-                })
-            )
+            ccipExtraArgs: Client._argsToBytes(Client.EVMExtraArgsV2({gasLimit: 200_000, allowOutOfOrderExecution: true}))
         });
 
         emit ChainWhitelisted(_destinationChainSelector);
@@ -235,8 +228,7 @@ contract TokenBridge is
         }
 
         messageId = IRouterClient(getRouter()).ccipSend{value: feeToken == address(0) ? fees : 0}(
-            destinationChainSelector,
-            message
+            destinationChainSelector, message
         );
 
         emit TokensBridged(messageId, msg.sender, receiver, amount, destinationChainSelector, feeToken, fees);

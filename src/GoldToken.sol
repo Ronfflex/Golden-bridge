@@ -105,7 +105,7 @@ contract GoldToken is Initializable, ERC20PausableUpgradeable, AccessControlUpgr
 
     function transfer(address to, uint256 amount) public override returns (bool) {
         require(amount > 0, AmountMustBeGreaterThanZero());
-        if(msg.sender != _lotterieAddress && balanceOf(msg.sender) <= _minimumGoldToBlock) {
+        if (msg.sender != _lotterieAddress && balanceOf(msg.sender) <= _minimumGoldToBlock) {
             removeUser(msg.sender);
         }
         addUser(to);
