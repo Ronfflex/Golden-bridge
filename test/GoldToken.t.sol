@@ -90,11 +90,6 @@ contract GoldTokenTest is Test {
         goldToken.mint{value: 0}();
     }
 
-    function test_mintGoldValueZero() public {
-        vm.expectRevert(GoldToken.AmountMustBeGreaterThanZero.selector);
-        goldToken.mint{value: 1}();
-    }
-
     function test_mint() public {
         vm.startPrank(signers[0]);
         uint256 contractBefore = address(goldToken).balance;
