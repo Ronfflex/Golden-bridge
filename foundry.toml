@@ -6,7 +6,7 @@ solc = "0.8.28"
 via-ir = true
 optimizer = true
 optimizer_runs = 200
-gas_reports = ["GoldToken"]
+gas_reports = ["GoldToken", "Lotterie", "TokenBridge"]
 
 remappings = [
     '@chainlink/local/=lib/chainlink-local/',

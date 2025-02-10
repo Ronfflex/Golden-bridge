@@ -6,9 +6,11 @@ import {Client} from "@chainlink/contracts-ccip/src/v0.8/ccip/libraries/Client.s
 import {CCIPReceiver} from "@chainlink/contracts-ccip/src/v0.8/ccip/applications/CCIPReceiver.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
-import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
-import {OwnerIsCreator} from "@chainlink/contracts-ccip/src/v0.8/shared/access/OwnerIsCreator.sol";
+import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
+import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {ITokenBridge} from "./interfaces/ITokenBridge.sol";
 
 /**
@@ -22,7 +24,15 @@ import {ITokenBridge} from "./interfaces/ITokenBridge.sol";
  *      - Emergency pause functionality
  *      - Security features including reentrancy protection
  */
-contract TokenBridge is CCIPReceiver, OwnerIsCreator, Pausable, ReentrancyGuard, ITokenBridge {
+contract TokenBridge is
+    Initializable,
+    CCIPReceiver,
+    AccessControlUpgradeable,
+    PausableUpgradeable,
+    ReentrancyGuardUpgradeable,
+    UUPSUpgradeable,
+    ITokenBridge
+{
     using SafeERC20 for IERC20;
 
     /*//////////////////////////////////////////////////////////////
@@ -43,17 +53,17 @@ contract TokenBridge is CCIPReceiver, OwnerIsCreator, Pausable, ReentrancyGuard,
                             STATE VARIABLES
     //////////////////////////////////////////////////////////////*/
 
+    /// @notice Role identifier for owners
+    bytes32 public constant OWNER_ROLE = keccak256("OWNER_ROLE");
+
     /// @notice Chain selector for the authorized destination chain (BSC)
-    /// @dev Immutable value set during deployment
-    uint64 public immutable override destinationChainSelector;
+    uint64 public override destinationChainSelector;
 
     /// @notice Contract address of the GoldToken being bridged
-    /// @dev Immutable value set during deployment
-    address public immutable override goldToken;
+    address public override goldToken;
 
     /// @notice Contract address of LINK token used for fee payments
-    /// @dev Immutable value set during deployment
-    address public immutable override link;
+    address public override link;
 
     /// @notice Tracks processed CCIP messages to prevent duplicates
     /// @dev Maps messageId => processed status
@@ -66,10 +76,6 @@ contract TokenBridge is CCIPReceiver, OwnerIsCreator, Pausable, ReentrancyGuard,
     /// @notice Tracks authorized cross-chain senders
     /// @dev Maps sender address => authorization status
     mapping(address => bool) public override whitelistedSenders;
-
-    /// @notice Gas limit for cross-chain operations
-    /// @dev Default value 200,000, can be updated by owner
-    uint256 private _ccipGasLimit;
 
     /*//////////////////////////////////////////////////////////////
                                MODIFIERS
@@ -87,23 +93,37 @@ contract TokenBridge is CCIPReceiver, OwnerIsCreator, Pausable, ReentrancyGuard,
     }
 
     /*//////////////////////////////////////////////////////////////
-                             CONSTRUCTOR
+                       CONSTRUCTOR & INITIALIZER
     //////////////////////////////////////////////////////////////*/
+
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor(address _router) CCIPReceiver(_router) {
+        _disableInitializers();
+    }
 
     /**
      * @notice Initializes the bridge with router, token addresses, and destination chain
      * @dev Sets up initial chain configuration with default parameters
-     * @param _router Address of the CCIP router contract
+     * @param owner Admin address for the contract
      * @param _link Address of the LINK token contract
      * @param _goldToken Address of the GoldToken contract
      * @param _destinationChainSelector Selector for the destination chain
      */
-    constructor(address _router, address _link, address _goldToken, uint64 _destinationChainSelector)
-        CCIPReceiver(_router)
+    function initialize(address owner, address _link, address _goldToken, uint64 _destinationChainSelector)
+        public
+        initializer
     {
-        if (_router == address(0) || _link == address(0) || _goldToken == address(0)) {
+        __AccessControl_init();
+        __Pausable_init();
+        __ReentrancyGuard_init();
+        __UUPSUpgradeable_init();
+
+        if (_link == address(0) || _goldToken == address(0)) {
             revert InvalidSender(address(0));
         }
+
+        _grantRole(OWNER_ROLE, owner);
+        _setRoleAdmin(OWNER_ROLE, OWNER_ROLE);
 
         link = _link;
         goldToken = _goldToken;
@@ -115,6 +135,44 @@ contract TokenBridge is CCIPReceiver, OwnerIsCreator, Pausable, ReentrancyGuard,
         });
 
         emit ChainWhitelisted(_destinationChainSelector);
+    }
+
+    /**
+     * @dev Function that should revert when `msg.sender` is not authorized to upgrade the contract
+     */
+    function _authorizeUpgrade(address) internal override onlyRole(OWNER_ROLE) {}
+
+    /**
+     * @dev Resolves the conflict between CCIPReceiver and AccessControlUpgradeable
+     */
+    function supportsInterface(bytes4 interfaceId)
+        public
+        view
+        virtual
+        override(AccessControlUpgradeable, CCIPReceiver)
+        returns (bool)
+    {
+        return super.supportsInterface(interfaceId);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                            OWNER FUNCTIONS
+    //////////////////////////////////////////////////////////////*/
+
+    /**
+     * @notice Adds a new owner to the contract
+     * @param account Address to be granted owner role
+     */
+    function addOwner(address account) external onlyRole(OWNER_ROLE) {
+        grantRole(OWNER_ROLE, account);
+    }
+
+    /**
+     * @notice Removes an owner from the contract
+     * @param account Address to be revoked owner role
+     */
+    function removeOwner(address account) external onlyRole(OWNER_ROLE) {
+        revokeRole(OWNER_ROLE, account);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -237,7 +295,7 @@ contract TokenBridge is CCIPReceiver, OwnerIsCreator, Pausable, ReentrancyGuard,
     function setWhitelistedChain(uint64 chainSelector, bool enabled, bytes memory ccipExtraArgs)
         external
         override
-        onlyOwner
+        onlyRole(OWNER_ROLE)
     {
         if (chainSelector == 0) revert InvalidChainSelector(chainSelector);
 
@@ -255,7 +313,7 @@ contract TokenBridge is CCIPReceiver, OwnerIsCreator, Pausable, ReentrancyGuard,
      * @param sender The sender address to update
      * @param enabled Whether to enable or disable the sender
      */
-    function setWhitelistedSender(address sender, bool enabled) external override onlyOwner {
+    function setWhitelistedSender(address sender, bool enabled) external override onlyRole(OWNER_ROLE) {
         if (sender == address(0)) revert InvalidSender(sender);
         whitelistedSenders[sender] = enabled;
         if (enabled) {
@@ -269,7 +327,7 @@ contract TokenBridge is CCIPReceiver, OwnerIsCreator, Pausable, ReentrancyGuard,
      * @notice Pauses bridge operations
      * @dev Can only be called by the owner
      */
-    function pause() external onlyOwner {
+    function pause() external onlyRole(OWNER_ROLE) {
         _pause();
     }
 
@@ -277,7 +335,7 @@ contract TokenBridge is CCIPReceiver, OwnerIsCreator, Pausable, ReentrancyGuard,
      * @notice Unpauses bridge operations
      * @dev Can only be called by the owner
      */
-    function unpause() external onlyOwner {
+    function unpause() external onlyRole(OWNER_ROLE) {
         _unpause();
     }
 
@@ -292,7 +350,7 @@ contract TokenBridge is CCIPReceiver, OwnerIsCreator, Pausable, ReentrancyGuard,
      * @notice Withdraws native tokens from the contract
      * @param beneficiary Address to receive the withdrawn tokens
      */
-    function withdraw(address beneficiary) external override onlyOwner nonReentrant {
+    function withdraw(address beneficiary) external override onlyRole(OWNER_ROLE) nonReentrant {
         uint256 amount = address(this).balance;
         if (amount == 0) revert InvalidAmount(0);
 
@@ -305,7 +363,7 @@ contract TokenBridge is CCIPReceiver, OwnerIsCreator, Pausable, ReentrancyGuard,
      * @param beneficiary Address to receive the withdrawn tokens
      * @param token Address of the token to withdraw
      */
-    function withdrawToken(address beneficiary, address token) external override onlyOwner nonReentrant {
+    function withdrawToken(address beneficiary, address token) external override onlyRole(OWNER_ROLE) nonReentrant {
         uint256 amount = IERC20(token).balanceOf(address(this));
         if (amount == 0) revert InvalidAmount(0);
 
@@ -339,5 +397,9 @@ contract TokenBridge is CCIPReceiver, OwnerIsCreator, Pausable, ReentrancyGuard,
      */
     function getGoldTokenBalance() external view override returns (uint256) {
         return IERC20(goldToken).balanceOf(address(this));
+    }
+
+    function hasOwnerRole(address account) external view returns (bool) {
+        return hasRole(OWNER_ROLE, account);
     }
 }
