@@ -211,10 +211,22 @@ contract TokenBridge is
         returns (bytes32 messageId)
     {
         if (amount == 0) revert InvalidAmount(amount);
+        if (receiver == address(0)) revert InvalidSender(receiver);
 
         IERC20(goldToken).safeTransferFrom(msg.sender, address(this), amount);
 
-        Client.EVM2AnyMessage memory message = _buildCCIPMessage(receiver, amount, feeToken);
+        Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](1);
+        tokenAmounts[0] = Client.EVMTokenAmount({token: goldToken, amount: amount});
+
+        IERC20(goldToken).approve(getRouter(), amount);
+
+        Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
+            receiver: abi.encode(receiver),
+            data: abi.encode(msg.sender),
+            tokenAmounts: tokenAmounts,
+            extraArgs: _chainDetails[destinationChainSelector].ccipExtraArgs,
+            feeToken: feeToken
+        });
 
         uint256 fees = IRouterClient(getRouter()).getFee(destinationChainSelector, message);
 
@@ -227,43 +239,26 @@ contract TokenBridge is
             IERC20(feeToken).approve(getRouter(), fees);
         }
 
+        // Send CCIP message
         messageId = IRouterClient(getRouter()).ccipSend{value: feeToken == address(0) ? fees : 0}(
             destinationChainSelector, message
         );
 
         emit TokensBridged(messageId, msg.sender, receiver, amount, destinationChainSelector, feeToken, fees);
-    }
 
-    /**
-     * @dev Builds the CCIP message for cross-chain communication
-     * @param receiver Address receiving the tokens
-     * @param amount Amount of tokens being transferred
-     * @param feeToken Token used for fee payment
-     * @return CCIP message structure
-     */
-    function _buildCCIPMessage(address receiver, uint256 amount, address feeToken)
-        internal
-        view
-        returns (Client.EVM2AnyMessage memory)
-    {
-        return Client.EVM2AnyMessage({
-            receiver: abi.encode(receiver),
-            data: abi.encode(amount),
-            tokenAmounts: new Client.EVMTokenAmount[](0),
-            extraArgs: _chainDetails[destinationChainSelector].ccipExtraArgs,
-            feeToken: feeToken
-        });
+        return messageId;
     }
 
     /**
      * @notice Processes incoming CCIP messages
-     * @dev Handles message verification and token distribution
+     * @dev Handles message verification and token distribution from CCIP
      * @param message The incoming CCIP message
      */
     function _ccipReceive(Client.Any2EVMMessage memory message) internal override whenNotPaused nonReentrant {
         if (processedMessages[message.messageId]) {
             revert MessageAlreadyProcessed(message.messageId);
         }
+
         if (!_chainDetails[message.sourceChainSelector].isEnabled) {
             revert ChainNotWhitelisted(message.sourceChainSelector);
         }
@@ -271,14 +266,32 @@ contract TokenBridge is
         address sender = abi.decode(message.sender, (address));
         if (!whitelistedSenders[sender]) revert SenderNotWhitelisted(sender);
 
-        (address receiver, uint256 amount) = abi.decode(message.data, (address, uint256));
-        if (amount == 0) revert InvalidAmount(amount);
+        address receiver = abi.decode(message.data, (address));
+        if (receiver == address(0)) revert InvalidSender(address(0));
 
-        processedMessages[message.messageId] = true;
+        bool foundGoldToken = false;
+        uint256 tokenAmount = 0;
 
-        IERC20(goldToken).safeTransfer(receiver, amount);
+        if (message.destTokenAmounts.length > 0) {
+            for (uint256 i = 0; i < message.destTokenAmounts.length; i++) {
+                if (message.destTokenAmounts[i].token == goldToken) {
+                    foundGoldToken = true;
+                    tokenAmount = message.destTokenAmounts[i].amount;
 
-        emit TokensReceived(message.messageId, receiver, amount, message.sourceChainSelector);
+                    if (tokenAmount == 0) revert InvalidAmount(0);
+
+                    processedMessages[message.messageId] = true;
+
+                    IERC20(goldToken).safeTransfer(receiver, tokenAmount);
+
+                    emit TokensReceived(message.messageId, receiver, tokenAmount, message.sourceChainSelector);
+                }
+            }
+        }
+
+        if (!foundGoldToken) {
+            processedMessages[message.messageId] = true;
+        }
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -353,6 +366,7 @@ contract TokenBridge is
     function withdraw(address beneficiary) external override onlyRole(OWNER_ROLE) nonReentrant {
         uint256 amount = address(this).balance;
         if (amount == 0) revert InvalidAmount(0);
+        if (beneficiary == address(0)) revert InvalidSender(address(0));
 
         (bool sent,) = beneficiary.call{value: amount}("");
         if (!sent) revert FailedToWithdrawEth(msg.sender, beneficiary, amount);
@@ -364,6 +378,9 @@ contract TokenBridge is
      * @param token Address of the token to withdraw
      */
     function withdrawToken(address beneficiary, address token) external override onlyRole(OWNER_ROLE) nonReentrant {
+        if (beneficiary == address(0)) revert InvalidSender(address(0));
+        if (token == address(0)) revert InvalidSender(address(0));
+
         uint256 amount = IERC20(token).balanceOf(address(this));
         if (amount == 0) revert InvalidAmount(0);
 
@@ -399,6 +416,11 @@ contract TokenBridge is
         return IERC20(goldToken).balanceOf(address(this));
     }
 
+    /**
+     * @notice Checks if an account has the owner role
+     * @param account The account to check
+     * @return bool True if the account has the owner role
+     */
     function hasOwnerRole(address account) external view returns (bool) {
         return hasRole(OWNER_ROLE, account);
     }

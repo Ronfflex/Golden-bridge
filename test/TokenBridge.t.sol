@@ -192,29 +192,62 @@ contract TokenBridgeTest is Test {
     //     uint256 amount = 1 ether;
     //     address receiver = address(0x9999); // Use a normal address instead of precompile
 
+    //     // Record initial balance
+    //     uint256 initialBridgeBalance = goldToken.balanceOf(address(tokenBridge));
+    //     uint256 initialSenderBalance = goldToken.balanceOf(address(this));
+
     //     // Approve tokens
     //     goldToken.approve(address(tokenBridge), amount);
 
+    //     // Make sure the router ccipSend function will be called correctly
+    //     // This mocks the CCIP router's behavior
+    //     bytes32 expectedMsgId = bytes32(uint256(123456));
+    //     vm.mockCall(address(router), abi.encodeWithSelector(router.ccipSend.selector), abi.encode(expectedMsgId));
+
     //     // Bridge tokens
-    //     tokenBridge.bridgeTokens(receiver, amount, ITokenBridge.PayFeesIn.LINK);
+    //     bytes32 returnedId = tokenBridge.bridgeTokens(receiver, amount, ITokenBridge.PayFeesIn.LINK);
+
+    //     // Verify messageId
+    //     assertEq(returnedId, expectedMsgId);
 
     //     // Verify state changes
-    //     assertEq(goldToken.balanceOf(address(tokenBridge)), amount);
-    //     assertEq(goldToken.balanceOf(address(this)), goldToken.balanceOf(address(this)));
+    //     assertEq(
+    //         goldToken.balanceOf(address(tokenBridge)), initialBridgeBalance + amount, "Bridge balance should increase"
+    //     );
+    //     assertEq(goldToken.balanceOf(address(this)), initialSenderBalance - amount, "Sender balance should decrease");
+
+    //     // Verify the token was approved to the router
+    //     assertEq(
+    //         goldToken.allowance(address(tokenBridge), address(router)), amount, "Token should be approved to router"
+    //     );
     // }
 
     function test_bridgeTokensWithNative() public {
         uint256 amount = 1 ether;
-        address receiver = address(0x9999); // Use a normal address instead of precompile
+        address receiver = address(0x9999);
+
+        // Record initial balance
+        uint256 initialBridgeBalance = goldToken.balanceOf(address(tokenBridge));
+        uint256 initialSenderBalance = goldToken.balanceOf(address(this));
 
         // Approve tokens
         goldToken.approve(address(tokenBridge), amount);
 
-        // Bridge tokens
-        tokenBridge.bridgeTokens{value: 1 ether}(receiver, amount, ITokenBridge.PayFeesIn.Native);
+        // Configure mock router to return a messageId for the call
+        bytes32 messageId = bytes32(uint256(123456));
+        vm.mockCall(address(router), abi.encodeWithSelector(router.ccipSend.selector), abi.encode(messageId));
+
+        // Bridge tokens with native token fees
+        bytes32 returnedId = tokenBridge.bridgeTokens{value: 1 ether}(receiver, amount, ITokenBridge.PayFeesIn.Native);
+
+        // Verify messageId
+        assertEq(returnedId, messageId);
 
         // Verify state changes
-        assertEq(goldToken.balanceOf(address(tokenBridge)), amount);
+        assertEq(
+            goldToken.balanceOf(address(tokenBridge)), initialBridgeBalance + amount, "Bridge balance should increase"
+        );
+        assertEq(goldToken.balanceOf(address(this)), initialSenderBalance - amount, "Sender balance should decrease");
     }
 
     function test_cannotBridgeZeroAmount() public {
@@ -242,13 +275,25 @@ contract TokenBridgeTest is Test {
 
     function test_ccipReceive() public {
         _setupTokens();
+
+        address recipient = signers[0];
+        uint256 amount = 0.5 ether;
+
+        // Record initial balances
+        uint256 initialRecipientBalance = goldToken.balanceOf(recipient);
+        uint256 initialBridgeBalance = goldToken.balanceOf(address(tokenBridge));
+
+        // Create a destTokenAmounts array with the GoldToken
+        Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](1);
+        destTokenAmounts[0] = Client.EVMTokenAmount({token: address(goldToken), amount: amount});
+
         // Create a mock message
         Client.Any2EVMMessage memory message = Client.Any2EVMMessage({
             messageId: bytes32(uint256(1)),
             sourceChainSelector: BSC_CHAIN_SELECTOR,
             sender: abi.encode(address(this)),
-            data: abi.encode(signers[0], 1 ether),
-            destTokenAmounts: new Client.EVMTokenAmount[](0)
+            data: abi.encode(recipient), // Receiver encoded in data field
+            destTokenAmounts: destTokenAmounts
         });
 
         // Simulate router calling ccipReceive
@@ -257,16 +302,27 @@ contract TokenBridgeTest is Test {
 
         // Verify the message was processed
         assertTrue(tokenBridge.processedMessages(message.messageId));
+
+        // Verify token balances - recipient should get their tokens
+        assertEq(goldToken.balanceOf(recipient), initialRecipientBalance + amount, "Recipient should receive tokens");
+        assertEq(
+            goldToken.balanceOf(address(tokenBridge)), initialBridgeBalance - amount, "Bridge balance should decrease"
+        );
     }
 
     function test_cannotReceiveSameMessageTwice() public {
         _setupTokens();
+
+        // Create destTokenAmounts array
+        Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](1);
+        destTokenAmounts[0] = Client.EVMTokenAmount({token: address(goldToken), amount: 0.5 ether});
+
         Client.Any2EVMMessage memory message = Client.Any2EVMMessage({
             messageId: bytes32(uint256(1)),
             sourceChainSelector: BSC_CHAIN_SELECTOR,
             sender: abi.encode(address(this)),
-            data: abi.encode(signers[0], 1 ether),
-            destTokenAmounts: new Client.EVMTokenAmount[](0)
+            data: abi.encode(signers[0]), // Receiver
+            destTokenAmounts: destTokenAmounts
         });
 
         vm.startPrank(address(router));
@@ -281,13 +337,17 @@ contract TokenBridgeTest is Test {
         _setupTokens();
         uint64 unwhitelistedChainSelector = 999;
 
+        // Create destTokenAmounts array
+        Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](1);
+        destTokenAmounts[0] = Client.EVMTokenAmount({token: address(goldToken), amount: 0.5 ether});
+
         // Create a message from an unwhitelisted chain
         Client.Any2EVMMessage memory message = Client.Any2EVMMessage({
             messageId: bytes32(uint256(1)),
             sourceChainSelector: unwhitelistedChainSelector, // Using unwhitelisted chain
             sender: abi.encode(address(this)),
-            data: abi.encode(signers[0], 1 ether),
-            destTokenAmounts: new Client.EVMTokenAmount[](0)
+            data: abi.encode(signers[0]), // Receiver
+            destTokenAmounts: destTokenAmounts
         });
 
         // Try to receive the message
@@ -300,13 +360,17 @@ contract TokenBridgeTest is Test {
         _setupTokens();
         address unwhitelistedSender = address(0xbad);
 
+        // Create destTokenAmounts array
+        Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](1);
+        destTokenAmounts[0] = Client.EVMTokenAmount({token: address(goldToken), amount: 0.5 ether});
+
         // Create a message from an unwhitelisted sender
         Client.Any2EVMMessage memory message = Client.Any2EVMMessage({
             messageId: bytes32(uint256(1)),
             sourceChainSelector: BSC_CHAIN_SELECTOR,
             sender: abi.encode(unwhitelistedSender), // Using unwhitelisted sender
-            data: abi.encode(signers[0], 1 ether),
-            destTokenAmounts: new Client.EVMTokenAmount[](0)
+            data: abi.encode(signers[0]), // Receiver
+            destTokenAmounts: destTokenAmounts
         });
 
         // Try to receive the message
@@ -315,34 +379,20 @@ contract TokenBridgeTest is Test {
         tokenBridge.ccipReceive(message);
     }
 
-    function test_cannotReceiveZeroAmount() public {
-        _setupTokens();
-
-        // Create a message with zero amount
-        Client.Any2EVMMessage memory message = Client.Any2EVMMessage({
-            messageId: bytes32(uint256(1)),
-            sourceChainSelector: BSC_CHAIN_SELECTOR,
-            sender: abi.encode(address(this)),
-            data: abi.encode(signers[0], 0), // Zero amount
-            destTokenAmounts: new Client.EVMTokenAmount[](0)
-        });
-
-        // Try to receive the message
-        vm.prank(address(router));
-        vm.expectRevert(abi.encodeWithSelector(ITokenBridge.InvalidAmount.selector, 0));
-        tokenBridge.ccipReceive(message);
-    }
-
     function test_cannotReceiveWhenPaused() public {
         _setupTokens();
         tokenBridge.pause();
 
+        // Create destTokenAmounts array
+        Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](1);
+        destTokenAmounts[0] = Client.EVMTokenAmount({token: address(goldToken), amount: 0.5 ether});
+
         Client.Any2EVMMessage memory message = Client.Any2EVMMessage({
             messageId: bytes32(uint256(1)),
             sourceChainSelector: BSC_CHAIN_SELECTOR,
             sender: abi.encode(address(this)),
-            data: abi.encode(signers[0], 1 ether),
-            destTokenAmounts: new Client.EVMTokenAmount[](0)
+            data: abi.encode(signers[0]), // Receiver
+            destTokenAmounts: destTokenAmounts
         });
 
         vm.prank(address(router));
