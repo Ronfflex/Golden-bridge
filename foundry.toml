@@ -7,14 +7,7 @@ via-ir = true
 optimizer = true
 optimizer_runs = 200
 gas_reports = ["GoldToken", "Lotterie", "TokenBridge"]
-
-remappings = [
-    '@chainlink/local/=lib/chainlink-local/',
-    '@chainlink/contracts-ccip=lib/ccip/contracts',
-    '@chainlink/contracts/=lib/chainlink-brownie-contracts/contracts/',
-    '@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/',
-    '@openzeppelin/contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts/',
-]
+no_match_coverage = "script/*"
 
 [rpc_endpoints]
 ethereumSepolia = "${ETHEREUM_SEPOLIA_RPC_URL}"

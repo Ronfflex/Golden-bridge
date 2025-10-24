@@ -8,8 +8,8 @@ import {GoldToken} from "../src/GoldToken.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {MockLinkToken} from "@chainlink/contracts/src/v0.8/mocks/MockLinkToken.sol";
 import {MockV3Aggregator} from "@chainlink/contracts/src/v0.8/tests/MockV3Aggregator.sol";
-import {MockCCIPRouter} from "@chainlink/contracts-ccip/src/v0.8/ccip/test/mocks/MockRouter.sol";
-import {Client} from "@chainlink/contracts-ccip/src/v0.8/ccip/libraries/Client.sol";
+import {MockCCIPRouter} from "@chainlink/contracts/src/v0.8/ccip/test/mocks/MockRouter.sol";
+import {Client} from "@chainlink/contracts/src/v0.8/ccip/libraries/Client.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
@@ -187,40 +187,40 @@ contract TokenBridgeTest is Test {
                             BRIDGE TESTS
     //////////////////////////////////////////////////////////////*/
 
-    // function test_bridgeTokensWithLink() public {
-    //     _setupLinkBalances();
-    //     uint256 amount = 1 ether;
-    //     address receiver = address(0x9999); // Use a normal address instead of precompile
+    function test_bridgeTokensWithLink() public {
+        _setupLinkBalances();
+        uint256 amount = 1 ether;
+        address receiver = address(0x9999); // Use a normal address instead of precompile
 
-    //     // Record initial balance
-    //     uint256 initialBridgeBalance = goldToken.balanceOf(address(tokenBridge));
-    //     uint256 initialSenderBalance = goldToken.balanceOf(address(this));
+        // Record initial balance
+        uint256 initialBridgeBalance = goldToken.balanceOf(address(tokenBridge));
+        uint256 initialSenderBalance = goldToken.balanceOf(address(this));
 
-    //     // Approve tokens
-    //     goldToken.approve(address(tokenBridge), amount);
+        // Approve tokens
+        goldToken.approve(address(tokenBridge), amount);
 
-    //     // Make sure the router ccipSend function will be called correctly
-    //     // This mocks the CCIP router's behavior
-    //     bytes32 expectedMsgId = bytes32(uint256(123456));
-    //     vm.mockCall(address(router), abi.encodeWithSelector(router.ccipSend.selector), abi.encode(expectedMsgId));
+        // Make sure the router ccipSend function will be called correctly
+        // This mocks the CCIP router's behavior
+        bytes32 expectedMsgId = bytes32(uint256(123456));
+        vm.mockCall(address(router), abi.encodeWithSelector(router.ccipSend.selector), abi.encode(expectedMsgId));
 
-    //     // Bridge tokens
-    //     bytes32 returnedId = tokenBridge.bridgeTokens(receiver, amount, ITokenBridge.PayFeesIn.LINK);
+        // Bridge tokens
+        bytes32 returnedId = tokenBridge.bridgeTokens(receiver, amount, ITokenBridge.PayFeesIn.LINK);
 
-    //     // Verify messageId
-    //     assertEq(returnedId, expectedMsgId);
+        // Verify messageId
+        assertEq(returnedId, expectedMsgId);
 
-    //     // Verify state changes
-    //     assertEq(
-    //         goldToken.balanceOf(address(tokenBridge)), initialBridgeBalance + amount, "Bridge balance should increase"
-    //     );
-    //     assertEq(goldToken.balanceOf(address(this)), initialSenderBalance - amount, "Sender balance should decrease");
+        // Verify state changes
+        assertEq(
+            goldToken.balanceOf(address(tokenBridge)), initialBridgeBalance + amount, "Bridge balance should increase"
+        );
+        assertEq(goldToken.balanceOf(address(this)), initialSenderBalance - amount, "Sender balance should decrease");
 
-    //     // Verify the token was approved to the router
-    //     assertEq(
-    //         goldToken.allowance(address(tokenBridge), address(router)), amount, "Token should be approved to router"
-    //     );
-    // }
+        // Verify the token was approved to the router
+        assertEq(
+            goldToken.allowance(address(tokenBridge), address(router)), amount, "Token should be approved to router"
+        );
+    }
 
     function test_bridgeTokensWithNative() public {
         uint256 amount = 1 ether;

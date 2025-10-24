@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {IRouterClient} from "@chainlink/contracts-ccip/src/v0.8/ccip/interfaces/IRouterClient.sol";
-import {Client} from "@chainlink/contracts-ccip/src/v0.8/ccip/libraries/Client.sol";
-import {CCIPReceiver} from "@chainlink/contracts-ccip/src/v0.8/ccip/applications/CCIPReceiver.sol";
+import {IRouterClient} from "@chainlink/contracts/src/v0.8/ccip/interfaces/IRouterClient.sol";
+import {Client} from "@chainlink/contracts/src/v0.8/ccip/libraries/Client.sol";
+import {CCIPReceiver} from "@chainlink/contracts/src/v0.8/ccip/applications/CCIPReceiver.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
-import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
@@ -29,7 +29,7 @@ contract TokenBridge is
     CCIPReceiver,
     AccessControlUpgradeable,
     PausableUpgradeable,
-    ReentrancyGuardUpgradeable,
+    ReentrancyGuard,
     UUPSUpgradeable,
     ITokenBridge
 {
@@ -115,8 +115,6 @@ contract TokenBridge is
     {
         __AccessControl_init();
         __Pausable_init();
-        __ReentrancyGuard_init();
-        __UUPSUpgradeable_init();
 
         if (_link == address(0) || _goldToken == address(0)) {
             revert InvalidSender(address(0));
@@ -131,7 +129,9 @@ contract TokenBridge is
 
         _chainDetails[_destinationChainSelector] = ChainDetails({
             isEnabled: true,
-            ccipExtraArgs: Client._argsToBytes(Client.EVMExtraArgsV2({gasLimit: 200_000, allowOutOfOrderExecution: true}))
+            ccipExtraArgs: Client._argsToBytes(
+                Client.EVMExtraArgsV2({gasLimit: 200_000, allowOutOfOrderExecution: true})
+            )
         });
 
         emit ChainWhitelisted(_destinationChainSelector);
@@ -221,8 +221,8 @@ contract TokenBridge is
         IERC20(goldToken).approve(getRouter(), amount);
 
         Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
-            receiver: abi.encode(receiver),
-            data: abi.encode(msg.sender),
+            receiver: abi.encode(address(this)),
+            data: abi.encode(receiver),
             tokenAmounts: tokenAmounts,
             extraArgs: _chainDetails[destinationChainSelector].ccipExtraArgs,
             feeToken: feeToken

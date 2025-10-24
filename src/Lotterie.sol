@@ -70,7 +70,6 @@ contract Lotterie is Initializable, AccessControlUpgradeable, UUPSUpgradeable, V
         address goldToken
     ) public initializer {
         __AccessControl_init();
-        __UUPSUpgradeable_init();
 
         _grantRole(OWNER_ROLE, owner);
         _setRoleAdmin(OWNER_ROLE, OWNER_ROLE);
