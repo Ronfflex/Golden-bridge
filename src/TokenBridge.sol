@@ -213,12 +213,13 @@ contract TokenBridge is
         if (amount == 0) revert InvalidAmount(amount);
         if (receiver == address(0)) revert InvalidSender(receiver);
 
-        IERC20(goldToken).safeTransferFrom(msg.sender, address(this), amount);
+        IERC20 gold = IERC20(goldToken);
+        gold.safeTransferFrom(msg.sender, address(this), amount);
 
         Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](1);
         tokenAmounts[0] = Client.EVMTokenAmount({token: goldToken, amount: amount});
 
-        IERC20(goldToken).approve(getRouter(), amount);
+        gold.forceApprove(getRouter(), amount);
 
         Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
             receiver: abi.encode(address(this)),
@@ -228,21 +229,22 @@ contract TokenBridge is
             feeToken: feeToken
         });
 
-        uint256 fees = IRouterClient(getRouter()).getFee(destinationChainSelector, message);
+        IRouterClient router = IRouterClient(getRouter());
+        uint256 fees = router.getFee(destinationChainSelector, message);
 
         if (feeToken == address(0)) {
             if (msg.value < fees) revert NotEnoughBalance(msg.value, fees);
         } else {
-            if (IERC20(feeToken).balanceOf(address(this)) < fees) {
-                revert NotEnoughBalance(IERC20(feeToken).balanceOf(address(this)), fees);
+            if (fees > 0) {
+                uint256 feeBalance = IERC20(feeToken).balanceOf(address(this));
+                if (feeBalance < fees) {
+                    revert NotEnoughBalance(feeBalance, fees);
+                }
+                IERC20(feeToken).forceApprove(getRouter(), fees);
             }
-            IERC20(feeToken).approve(getRouter(), fees);
         }
 
-        // Send CCIP message
-        messageId = IRouterClient(getRouter()).ccipSend{value: feeToken == address(0) ? fees : 0}(
-            destinationChainSelector, message
-        );
+        messageId = router.ccipSend{value: feeToken == address(0) ? fees : 0}(destinationChainSelector, message);
 
         emit TokensBridged(messageId, msg.sender, receiver, amount, destinationChainSelector, feeToken, fees);
 
