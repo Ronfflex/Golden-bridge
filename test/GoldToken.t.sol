@@ -143,6 +143,24 @@ contract GoldTokenTest is Test {
         assertEq(timestamps[0], block.timestamp);
     }
 
+    function test_getGoldPriceInEth() public view {
+        int256 expected = _expectedGoldPriceInEth(100000000000, 50000000000);
+        assertEq(goldToken.getGoldPriceInEth(), expected);
+    }
+
+    function test_getGoldPriceInEth_reactsToFeedUpdates() public {
+        goldAggregator.updateAnswer(int256(180000000000)); // 1800 USD per troy ounce
+        ethAggregator.updateAnswer(int256(200000000000)); // 2000 USD per ETH
+
+        int256 expected = _expectedGoldPriceInEth(180000000000, 200000000000);
+        assertEq(goldToken.getGoldPriceInEth(), expected);
+    }
+
+    function _expectedGoldPriceInEth(int256 goldUsdPerTroyOunce, int256 ethUsd) internal pure returns (int256) {
+        int256 goldUsdPerGram = (goldUsdPerTroyOunce * 10_000_000) / 311_034_768;
+        return (goldUsdPerGram * 10 ** 8) / ethUsd;
+    }
+
     fallback() external payable {}
     receive() external payable {}
 }
