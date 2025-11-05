@@ -181,14 +181,15 @@ contract GoldToken is Initializable, ERC20PausableUpgradeable, AccessControlUpgr
     }
 
     /**
-     * @dev Gets the current gold price in ETH.
-     * @return The price of gold in ETH.
+     * @dev Gets the current price of 1 gram of gold in ETH.
+     * @return The price of 1 gram of gold in ETH.
      */
     function getGoldPriceInEth() public view returns (int256) {
-        (, int256 goldUsd,,,) = _dataFeedGold.latestRoundData(); // 31,1 gold = x USD
-        goldUsd = goldUsd / 311; // 1 gold = (goldUsd / 311) USD
-        (, int256 ethUsd,,,) = _dataFeedEth.latestRoundData(); // 1 ETH = y USD
-        return goldUsd * 10 ** 8 / ethUsd; // 1 gold = (goldUsd / ethUsd) ETH
+        (, int256 goldUsdPerTroyOunce,,,) = _dataFeedGold.latestRoundData(); // Price per troy ounce (31.1034768 g) = x USD (8 decimals)
+        int256 goldUsdPerGram = (goldUsdPerTroyOunce * 10_000_000) / 311_034_768; // Multiply first to preserve precision
+
+        (, int256 ethUsd,,,) = _dataFeedEth.latestRoundData(); // 1 ETH = y USD (8 decimals)
+        return goldUsdPerGram * 10 ** 8 / ethUsd; // Multiply first to preserve precision
     }
 
     /**
