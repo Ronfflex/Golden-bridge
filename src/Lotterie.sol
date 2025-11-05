@@ -76,8 +76,8 @@ contract Lotterie is Initializable, AccessControlUpgradeable, UUPSUpgradeable, V
 
         _s_subscriptionId = subscriptionId;
 
-        _vrfCoordinator = vrfCoordinator; // 0x9DdfaCa8183c41ad55329BdeeD9F6A8d53168B1B
-        _s_keyHash = keyHash; // 0x787d74caea10b2b357790d5b5247c2f63d1d91572a9846f780606e4d953677ae
+        _vrfCoordinator = vrfCoordinator;
+        _s_keyHash = keyHash;
         _callbackGasLimit = callbackGasLimit; // 40000
         _requestConfirmations = requestConfirmations; // 3
         _numWords = numWords; // 1
@@ -125,7 +125,7 @@ contract Lotterie is Initializable, AccessControlUpgradeable, UUPSUpgradeable, V
                 callbackGasLimit: _callbackGasLimit,
                 numWords: _numWords,
                 // Set nativePayment to true to pay for VRF requests with Sepolia ETH instead of LINK
-                extraArgs: VRFV2PlusClient._argsToBytes(VRFV2PlusClient.ExtraArgsV1({nativePayment: true}))
+                extraArgs: VRFV2PlusClient._argsToBytes(VRFV2PlusClient.ExtraArgsV1({nativePayment: false}))
             })
         );
 

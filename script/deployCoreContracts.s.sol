@@ -9,28 +9,32 @@ import {TokenBridge} from "../src/TokenBridge.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
 /**
- * @title DeployGoldenBridge
+ * @title DeployCoreContracts
  * @notice Deployment script for the Golden Bridge system
  * @dev This script needs to be run twice - once on each chain (Sepolia and BSC Testnet)
  *      After deployment, the bridge contracts need to be configured to trust each other
  *
  * Deploy steps:
+ * 0. Environment variables:
+ *    Make sure you have completed the required fields in the .env file.
+ *
  * 1. Deploy on Sepolia:
- *    forge script script/Deploy.s.sol:DeployGoldenBridge --rpc-url $SEPOLIA_RPC_URL --broadcast -vvvv
+ *    forge script script/deployCoreContracts.s.sol:DeployCoreContracts --rpc-url $ETHEREUM_SEPOLIA_RPC_URL --broadcast --verify
  *
  * 2. Deploy on BSC Testnet:
- *    forge script script/Deploy.s.sol:DeployGoldenBridge --rpc-url $BSC_RPC_URL --broadcast -vvvv
+ *    forge script script/deployCoreContracts.s.sol:DeployCoreContracts --rpc-url $BNB_CHAIN_TESTNET_RPC_URL --broadcast --verify --gas-price 3000000000
  *
  * 3. After deployment, call these functions on both bridge contracts:
  *    - setWhitelistedSender(otherBridgeAddress, true)
  *    - On Sepolia: setWhitelistedChain(BSC_CHAIN_SELECTOR, true, defaultExtraArgs)
  *    - On BSC: setWhitelistedChain(SEPOLIA_CHAIN_SELECTOR, true, defaultExtraArgs)
  */
-contract DeployGoldenBridge is Script {
+contract DeployCoreContracts is Script {
     // Network specific configurations
     struct NetworkConfig {
         address router; // CCIP Router
         address link; // LINK Token
+        uint256 vrfSubscriptionId; // VRF Subscription ID
         uint64 chainSelector; // This chain's selector
         uint64 destSelector; // Destination chain's selector
         address goldUsdFeed; // Gold/USD price feed
@@ -43,6 +47,7 @@ contract DeployGoldenBridge is Script {
     NetworkConfig sepoliaConfig = NetworkConfig({
         router: 0x0BF3dE8c5D3e8A2B34D2BEeB17ABfCeBaf363A59,
         link: 0x779877A7B0D9E8603169DdbD7836e478b4624789,
+        vrfSubscriptionId: uint256(vm.envUint("ETHEREUM_SEPOLIA_VRF_SUBSCRIPTION_ID")),
         chainSelector: 16015286601757825753, // Sepolia chain selector
         destSelector: 13264668187771770619, // BSC Testnet selector
         goldUsdFeed: 0xC5981F461d74c46eB4b0CF3f4Ec79f025573B0Ea,
@@ -55,12 +60,13 @@ contract DeployGoldenBridge is Script {
     NetworkConfig bscTestnetConfig = NetworkConfig({
         router: 0x9527E2D01a3064eF6B50c1DA1C0cc523803BcDf3,
         link: 0x84b9B910527Ad5C03A9Ca831909E21e236EA7b06,
+        vrfSubscriptionId: uint256(vm.envUint("BSC_TESTNET_VRF_SUBSCRIPTION_ID")),
         chainSelector: 13264668187771770619, // BSC Testnet chain selector
         destSelector: 16015286601757825753, // Sepolia selector
         goldUsdFeed: 0x569B6c1C194ff744F344B862aD5039B106271601, // Replace with actual BSC feed
         ethUsdFeed: 0x2514895c72f50D8bd4B4F9b1110F0D6bD2c97526, // BNB/USD feed
-        vrfCoordinator: 0x6A2AAd07396B36Fe02a22b33cf443582f682c82f,
-        keyHash: 0xd4bb89654db74673a187bd804519e65e3f71a52bc55f11da7601a13dcf505314
+        vrfCoordinator: 0xDA3b641D438362C440Ac5458c57e00a712b66700,
+        keyHash: 0x8596b430971ac45bdf6088665b9ad8e8630c9d5049ab54b14dff711bee7c0e26
     });
 
     // Chainlink VRF parameters (same for both networks)
@@ -79,11 +85,11 @@ contract DeployGoldenBridge is Script {
         if (chainId == 11155111) {
             // Sepolia
             config = sepoliaConfig;
-            console2.log("Deploying to Sepolia");
+            console2.log("Deploying to Sepolia. Chain ID:", chainId);
         } else if (chainId == 97) {
             // BSC Testnet
             config = bscTestnetConfig;
-            console2.log("Deploying to BSC Testnet");
+            console2.log("Deploying to BSC Testnet. Chain ID:", chainId);
         } else {
             revert("Unsupported network");
         }
@@ -101,13 +107,10 @@ contract DeployGoldenBridge is Script {
         ERC1967Proxy goldTokenProxy = new ERC1967Proxy(address(goldTokenImpl), goldTokenData);
         GoldToken goldToken = GoldToken(address(goldTokenProxy));
 
-        // Get VRF subscription ID from environment
-        uint64 subscriptionId = uint64(vm.envUint("VRF_SUBSCRIPTION_ID"));
-
         bytes memory lotterieData = abi.encodeWithSelector(
             Lotterie.initialize.selector,
             deployer,
-            subscriptionId,
+            config.vrfSubscriptionId,
             config.vrfCoordinator,
             config.keyHash,
             CALLBACK_GAS_LIMIT,
@@ -142,7 +145,7 @@ contract DeployGoldenBridge is Script {
         console2.log("TokenBridge implementation:", address(bridgeImpl));
         console2.log("TokenBridge proxy:", address(bridge));
         console2.log("\nNext steps:");
-        console2.log("1. Deploy on the other chain");
+        console2.log("1. Deploy on the other chain if not already done");
         console2.log("2. Call setWhitelistedSender() on both bridges");
         console2.log("3. Call setWhitelistedChain() on both bridges");
 
