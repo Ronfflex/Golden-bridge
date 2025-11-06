@@ -3,6 +3,7 @@ pragma solidity 0.8.28;
 
 import {VRFConsumerBaseV2Plus} from "@chainlink/contracts/src/v0.8/vrf/dev/VRFConsumerBaseV2Plus.sol";
 import {VRFV2PlusClient} from "@chainlink/contracts/src/v0.8/vrf/dev/libraries/VRFV2PlusClient.sol";
+import {IVRFCoordinatorV2Plus} from "@chainlink/contracts/src/v0.8/vrf/dev/interfaces/IVRFCoordinatorV2Plus.sol";
 import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
@@ -15,13 +16,13 @@ import "./interfaces/IGoldToken.sol";
  */
 contract Lotterie is Initializable, AccessControlUpgradeable, UUPSUpgradeable, VRFConsumerBaseV2Plus {
     bytes32 public constant OWNER_ROLE = keccak256("OWNER_ROLE");
-    uint256 internal _s_subscriptionId;
-    address internal _vrfCoordinator;
-    bytes32 internal _s_keyHash;
+    uint256 private constant ROLL_IN_PROGRESS = 42;
+
+    uint256 internal _vrfSubscriptionId;
+    bytes32 internal _vrfKeyHash;
     uint32 internal _callbackGasLimit;
     uint16 internal _requestConfirmations;
     uint32 internal _numWords;
-    uint256 private constant ROLL_IN_PROGRESS = 42;
 
     IGoldToken internal _goldToken;
 
@@ -30,7 +31,7 @@ contract Lotterie is Initializable, AccessControlUpgradeable, UUPSUpgradeable, V
     mapping(uint256 => address) internal _results;
     mapping(address => uint256) internal _gains;
 
-    error OneRandomDrawPerMounth();
+    error OneRandomDrawPerDay();
 
     /**
      * @dev Emitted when a random draw occurs.
@@ -51,7 +52,7 @@ contract Lotterie is Initializable, AccessControlUpgradeable, UUPSUpgradeable, V
     /**
      * @dev Initializes the contract with the necessary parameters.
      * @param owner The address of the owner.
-     * @param subscriptionId The subscription ID for Chainlink VRF.
+     * @param vrfSubscriptionId The subscription ID for Chainlink VRF.
      * @param vrfCoordinator The address of the VRF coordinator.
      * @param keyHash The key hash for the VRF.
      * @param callbackGasLimit The gas limit for the callback.
@@ -61,7 +62,7 @@ contract Lotterie is Initializable, AccessControlUpgradeable, UUPSUpgradeable, V
      */
     function initialize(
         address owner,
-        uint256 subscriptionId,
+        uint256 vrfSubscriptionId,
         address vrfCoordinator,
         bytes32 keyHash,
         uint32 callbackGasLimit,
@@ -74,15 +75,14 @@ contract Lotterie is Initializable, AccessControlUpgradeable, UUPSUpgradeable, V
         _grantRole(OWNER_ROLE, owner);
         _setRoleAdmin(OWNER_ROLE, OWNER_ROLE);
 
-        _s_subscriptionId = subscriptionId;
-
-        _vrfCoordinator = vrfCoordinator;
-        _s_keyHash = keyHash;
+        _vrfSubscriptionId = vrfSubscriptionId;
+        s_vrfCoordinator = IVRFCoordinatorV2Plus(vrfCoordinator);
+        _vrfKeyHash = keyHash;
         _callbackGasLimit = callbackGasLimit; // 40000
         _requestConfirmations = requestConfirmations; // 3
         _numWords = numWords; // 1
 
-        _lastRandomDraw = block.timestamp;
+        _lastRandomDraw = block.timestamp - 1 days;
         _goldToken = IGoldToken(goldToken);
     }
 
@@ -114,13 +114,12 @@ contract Lotterie is Initializable, AccessControlUpgradeable, UUPSUpgradeable, V
      * @notice Can only be called by an account with the OWNER_ROLE.
      */
     function randomDraw() external onlyRole(OWNER_ROLE) returns (uint256 requestId) {
-        // One randomdraw per mounth
-        require(_lastRandomDraw + 30 days <= block.timestamp, OneRandomDrawPerMounth());
+        require(_lastRandomDraw + 1 days <= block.timestamp, OneRandomDrawPerDay()); // One randomdraw per day
 
         requestId = s_vrfCoordinator.requestRandomWords(
             VRFV2PlusClient.RandomWordsRequest({
-                keyHash: _s_keyHash,
-                subId: _s_subscriptionId,
+                keyHash: _vrfKeyHash,
+                subId: _vrfSubscriptionId,
                 requestConfirmations: _requestConfirmations,
                 callbackGasLimit: _callbackGasLimit,
                 numWords: _numWords,
@@ -205,7 +204,7 @@ contract Lotterie is Initializable, AccessControlUpgradeable, UUPSUpgradeable, V
      * @return The address of the VRF coordinator.
      */
     function getVrfCoordinator() external view returns (address) {
-        return _vrfCoordinator;
+        return address(s_vrfCoordinator);
     }
 
     /**
@@ -213,7 +212,7 @@ contract Lotterie is Initializable, AccessControlUpgradeable, UUPSUpgradeable, V
      * @return The key hash.
      */
     function getKeyHash() external view returns (bytes32) {
-        return _s_keyHash;
+        return _vrfKeyHash;
     }
 
     /**
@@ -250,19 +249,19 @@ contract Lotterie is Initializable, AccessControlUpgradeable, UUPSUpgradeable, V
 
     /**
      * @dev Gets the subscription ID for Chainlink VRF.
-     * @return The subscription ID.
+     * @return The VRF subscription ID.
      */
-    function getSubscriptionId() external view returns (uint256) {
-        return _s_subscriptionId;
+    function getVrfSubscriptionId() external view returns (uint256) {
+        return _vrfSubscriptionId;
     }
 
     /**
      * @dev Sets a new subscription ID for Chainlink VRF.
-     * @param subscriptionId The new subscription ID.
+     * @param vrfSubscriptionId The new VRF subscription ID.
      * @notice Can only be called by an account with the OWNER_ROLE.
      */
-    function setSubscriptionId(uint256 subscriptionId) external onlyRole(OWNER_ROLE) {
-        _s_subscriptionId = subscriptionId;
+    function setVrfSubscriptionId(uint256 vrfSubscriptionId) external onlyRole(OWNER_ROLE) {
+        _vrfSubscriptionId = vrfSubscriptionId;
     }
 
     /**
@@ -271,7 +270,7 @@ contract Lotterie is Initializable, AccessControlUpgradeable, UUPSUpgradeable, V
      * @notice Can only be called by an account with the OWNER_ROLE.
      */
     function setVrfCoordinator(address vrfCoordinator) external onlyRole(OWNER_ROLE) {
-        _vrfCoordinator = vrfCoordinator;
+        s_vrfCoordinator = IVRFCoordinatorV2Plus(vrfCoordinator);
     }
 
     /**
@@ -280,7 +279,7 @@ contract Lotterie is Initializable, AccessControlUpgradeable, UUPSUpgradeable, V
      * @notice Can only be called by an account with the OWNER_ROLE.
      */
     function setKeyHash(bytes32 keyHash) external onlyRole(OWNER_ROLE) {
-        _s_keyHash = keyHash;
+        _vrfKeyHash = keyHash;
     }
 
     /**

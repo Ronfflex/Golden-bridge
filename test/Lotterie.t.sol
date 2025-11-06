@@ -19,6 +19,9 @@ contract LotterieTest is Test {
     VRFCoordinatorV2_5Mock public vrfCoordinator;
 
     function setUp() public {
+        // Advance time by 2 days to avoid underflow issues with last random draw time (set during initialization to block.timestamp - 1 days)
+        vm.warp(block.timestamp + 2 days);
+
         signers = [address(0x1), address(0x2), address(0x3)];
 
         mockGold = new MockV3Aggregator(8, int256(100000000000)); // 100.00 USD
@@ -72,25 +75,27 @@ contract LotterieTest is Test {
         assertFalse(isOwner, "signers[0] have OWNER_ROLE");
     }
 
-    function test_randomDrawBefore30Days() public {
-        vm.expectRevert(Lotterie.OneRandomDrawPerMounth.selector);
+    function test_randomDrawBefore1DayWaiting() public {
+        vm.warp(block.timestamp - 1 hours);
+        vm.expectRevert(Lotterie.OneRandomDrawPerDay.selector);
         lotterie.randomDraw();
     }
 
-    // function test_randomDraw() public {
-    //     vm.warp(block.timestamp + 30 days);
-    //     lotterie.randomDraw();
-    // }
+    function test_randomDraw() public {
+        vm.warp(block.timestamp + 1 days);
+        console2.log("Current time:", block.timestamp + 1 days);
+        lotterie.randomDraw();
+    }
 
     function test_claim() public {
         vm.expectRevert("No gain to claim");
         lotterie.claim();
     }
 
-    function test_setSubscriptionId() public {
-        lotterie.setSubscriptionId(10);
-        uint256 subscriptionId = lotterie.getSubscriptionId();
-        assertEq(subscriptionId, 10, "subscriptionId should be 10");
+    function test_setVrfSubscriptionId() public {
+        lotterie.setVrfSubscriptionId(10);
+        uint256 vrfSubscriptionId = lotterie.getVrfSubscriptionId();
+        assertEq(vrfSubscriptionId, 10, "vrfSubscriptionId should be 10");
     }
 
     function test_setVrfCoordinator() public {
