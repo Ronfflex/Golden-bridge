@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import "forge-std/Test.sol";
+import {Test} from "forge-std/Test.sol";
 import {ITokenBridge} from "../src/interfaces/ITokenBridge.sol";
 import {TokenBridge} from "../src/TokenBridge.sol";
 import {GoldToken} from "../src/GoldToken.sol";
@@ -10,7 +10,6 @@ import {MockLinkToken} from "@chainlink/contracts/src/v0.8/mocks/MockLinkToken.s
 import {MockV3Aggregator} from "@chainlink/contracts/src/v0.8/tests/MockV3Aggregator.sol";
 import {MockCCIPRouter} from "@chainlink/contracts/src/v0.8/ccip/test/mocks/MockRouter.sol";
 import {Client} from "@chainlink/contracts/src/v0.8/ccip/libraries/Client.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
@@ -112,7 +111,8 @@ contract TokenBridgeTest is Test {
 
     function _setupTokens() internal {
         goldToken.mint{value: 10 ether}();
-        goldToken.transfer(address(tokenBridge), 1 ether);
+        bool success = goldToken.transfer(address(tokenBridge), 1 ether);
+        assertTrue(success, "transfer to bridge should succeed");
     }
 
     /*//////////////////////////////////////////////////////////////

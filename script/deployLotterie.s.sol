@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import "forge-std/Script.sol";
-import "../src/Lotterie.sol";
-import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
+import {Script, console2} from "forge-std/Script.sol";
+import {Lotterie} from "../src/Lotterie.sol";
+import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
 contract DeployLotterie is Script {
     address goldToken = 0x9DdfaCa8183c41ad55329BdeeD9F6A8d53168B1B; // goldToken on sepolia
@@ -15,7 +15,7 @@ contract DeployLotterie is Script {
 
         Lotterie implementation = new Lotterie(vrfCoordinator); // coordinator on sepolia
 
-        console.log("Lotterie deployed at:", address(implementation));
+        console2.log("Lotterie deployed at:", address(implementation));
 
         bytes memory data = abi.encodeWithSelector(
             Lotterie(implementation).initialize.selector,
@@ -31,7 +31,7 @@ contract DeployLotterie is Script {
 
         ERC1967Proxy proxy = new ERC1967Proxy(address(implementation), data);
 
-        console.log("Lotterie proxy deployed at:", address(proxy));
+        console2.log("Lotterie proxy deployed at:", address(proxy));
 
         vm.stopBroadcast();
     }

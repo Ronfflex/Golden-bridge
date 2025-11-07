@@ -1,19 +1,20 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import "forge-std/Test.sol";
-import "../src/Lotterie.sol";
-import "../src/GoldToken.sol";
-import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
-import "@chainlink/contracts/src/v0.8/vrf/mocks/VRFCoordinatorV2_5Mock.sol";
-import "@chainlink/contracts/src/v0.8/tests/MockV3Aggregator.sol";
+import {Test, console2} from "forge-std/Test.sol";
+import {Lotterie} from "../src/Lotterie.sol";
+import {ILotterie} from "../src/interfaces/ILotterie.sol";
+import {GoldToken} from "../src/GoldToken.sol";
+import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
+import {VRFCoordinatorV2_5Mock} from "@chainlink/contracts/src/v0.8/vrf/mocks/VRFCoordinatorV2_5Mock.sol";
+import {MockV3Aggregator} from "@chainlink/contracts/src/v0.8/tests/MockV3Aggregator.sol";
 
 contract LotterieTest is Test {
     address[] public signers;
 
     GoldToken public goldToken;
     MockV3Aggregator public mockGold;
-    MockV3Aggregator public mockETH;
+    MockV3Aggregator public mockEth;
 
     Lotterie public lotterie;
     VRFCoordinatorV2_5Mock public vrfCoordinator;
@@ -25,12 +26,12 @@ contract LotterieTest is Test {
         signers = [address(0x1), address(0x2), address(0x3)];
 
         mockGold = new MockV3Aggregator(8, int256(100000000000)); // 100.00 USD
-        mockETH = new MockV3Aggregator(8, int256(50000000000)); // 50.00 USD
+        mockEth = new MockV3Aggregator(8, int256(50000000000)); // 50.00 USD
 
         GoldToken implementation1 = new GoldToken();
         ERC1967Proxy proxy1 = new ERC1967Proxy(
             address(implementation1),
-            abi.encodeWithSelector(GoldToken.initialize.selector, address(this), address(mockGold), address(mockETH))
+            abi.encodeWithSelector(GoldToken.initialize.selector, address(this), address(mockGold), address(mockEth))
         );
         goldToken = GoldToken(address(proxy1));
 
@@ -59,8 +60,10 @@ contract LotterieTest is Test {
 
         goldToken.setLotterieAddress(address(lotterie));
         goldToken.mint{value: 10000}();
-        goldToken.transfer(signers[0], 100);
-        goldToken.transfer(signers[1], 100);
+        bool transferToSigner0 = goldToken.transfer(signers[0], 100);
+        bool transferToSigner1 = goldToken.transfer(signers[1], 100);
+        assertTrue(transferToSigner0, "transfer to signer 0 should succeed");
+        assertTrue(transferToSigner1, "transfer to signer 1 should succeed");
     }
 
     function test_addOwner() public {
@@ -77,7 +80,7 @@ contract LotterieTest is Test {
 
     function test_randomDrawBefore1DayWaiting() public {
         vm.warp(block.timestamp - 1 hours);
-        vm.expectRevert(Lotterie.OneRandomDrawPerDay.selector);
+        vm.expectRevert(ILotterie.OneRandomDrawPerDay.selector);
         lotterie.randomDraw();
     }
 
@@ -88,7 +91,7 @@ contract LotterieTest is Test {
     }
 
     function test_claim() public {
-        vm.expectRevert("No gain to claim");
+        vm.expectRevert(ILotterie.NoGainToClaim.selector);
         lotterie.claim();
     }
 
@@ -105,9 +108,10 @@ contract LotterieTest is Test {
     }
 
     function test_setKeyHash() public {
-        lotterie.setKeyHash(bytes32("10"));
+        bytes32 expectedKeyHash = keccak256(abi.encodePacked("test-key-hash"));
+        lotterie.setKeyHash(expectedKeyHash);
         bytes32 keyHash = lotterie.getKeyHash();
-        assertEq(keyHash, bytes32("10"), "keyHash should be 10");
+        assertEq(keyHash, expectedKeyHash, "keyHash should match expected value");
     }
 
     function test_setCallbackGasLimit() public {

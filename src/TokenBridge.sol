@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
+import {ITokenBridge} from "./interfaces/ITokenBridge.sol";
 import {IRouterClient} from "@chainlink/contracts/src/v0.8/ccip/interfaces/IRouterClient.sol";
 import {Client} from "@chainlink/contracts/src/v0.8/ccip/libraries/Client.sol";
 import {CCIPReceiver} from "@chainlink/contracts/src/v0.8/ccip/applications/CCIPReceiver.sol";
@@ -11,7 +12,6 @@ import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol
 import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-import {ITokenBridge} from "./interfaces/ITokenBridge.sol";
 
 /**
  * @title TokenBridge
@@ -22,7 +22,6 @@ import {ITokenBridge} from "./interfaces/ITokenBridge.sol";
  *      - Message verification and processing
  *      - Chain and sender whitelisting
  *      - Emergency pause functionality
- *      - Security features including reentrancy protection
  */
 contract TokenBridge is
     Initializable,
@@ -86,9 +85,7 @@ contract TokenBridge is
      * @param chainSelector The chain selector to verify
      */
     modifier onlyEnabledChain(uint64 chainSelector) {
-        if (!_chainDetails[chainSelector].isEnabled) {
-            revert ChainNotWhitelisted(chainSelector);
-        }
+        _onlyEnabledChain(chainSelector);
         _;
     }
 
@@ -293,6 +290,17 @@ contract TokenBridge is
 
         if (!foundGoldToken) {
             processedMessages[message.messageId] = true;
+        }
+    }
+
+    /**
+     * @notice Ensures operations only proceed with whitelisted chains
+     * @dev Unwrapped onlyEnabledChain modifier logic to reduce bytecode size
+     * @param chainSelector The chain selector to verify
+     */
+    function _onlyEnabledChain(uint64 chainSelector) internal view {
+        if (!_chainDetails[chainSelector].isEnabled) {
+            revert ChainNotWhitelisted(chainSelector);
         }
     }
 

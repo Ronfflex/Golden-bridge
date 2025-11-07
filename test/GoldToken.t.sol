@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import "forge-std/Test.sol";
-import "../src/GoldToken.sol";
-import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
-import "@chainlink/contracts/src/v0.8/tests/MockV3Aggregator.sol";
+import {Test} from "forge-std/Test.sol";
+import {GoldToken} from "../src/GoldToken.sol";
+import {IGoldToken} from "../src/interfaces/IGoldToken.sol";
+import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
+import {MockV3Aggregator} from "@chainlink/contracts/src/v0.8/tests/MockV3Aggregator.sol";
 
 contract GoldTokenTest is Test {
     GoldToken public goldToken;
@@ -86,7 +87,7 @@ contract GoldTokenTest is Test {
     }
 
     function test_mintValueZero() public {
-        vm.expectRevert(GoldToken.ValueMustBeGreaterThanZero.selector);
+        vm.expectRevert(IGoldToken.ValueMustBeGreaterThanZero.selector);
         goldToken.mint{value: 0}();
     }
 
@@ -111,14 +112,17 @@ contract GoldTokenTest is Test {
 
     function test_transfer() public {
         goldToken.mint{value: 10000}(); // Receive 5000 GLD
-        goldToken.transfer(address(signers[0]), 1000);
+        bool success = goldToken.transfer(address(signers[0]), 1000);
+        assertTrue(success, "transfer should succeed");
         uint256 balance = goldToken.balanceOf(address(this));
         assertTrue(balance > 0);
     }
 
     function test_transferAmountZero() public {
         goldToken.mint{value: 10000}(); // Receive 5000 GLD
-        vm.expectRevert(GoldToken.AmountMustBeGreaterThanZero.selector);
+        vm.expectRevert(IGoldToken.AmountMustBeGreaterThanZero.selector);
+        // transfer returns a value but this call reverts before the response is produced
+        // forge-lint: disable-next-line(erc20-unchecked-transfer)
         goldToken.transfer(address(signers[0]), 0);
     }
 
