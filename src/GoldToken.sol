@@ -86,7 +86,6 @@ contract GoldToken is Initializable, ERC20PausableUpgradeable, AccessControlUpgr
         revokeRole(OWNER_ROLE, account);
     }
 
-
     /*//////////////////////////////////////////////////////////////
                             ADMIN FUNCTIONS
     //////////////////////////////////////////////////////////////*/
@@ -121,7 +120,7 @@ contract GoldToken is Initializable, ERC20PausableUpgradeable, AccessControlUpgr
     //////////////////////////////////////////////////////////////*/
 
     /**
-     * @notice Mints GLD by converting the caller's ETH using the latest Chainlink price feeds
+     * @inheritdoc IGoldToken
      * @dev Applies protocol fees split between Lotterie and fee recipient, tracking lottery eligibility
      */
     function mint() external payable override whenNotPaused {
@@ -156,10 +155,7 @@ contract GoldToken is Initializable, ERC20PausableUpgradeable, AccessControlUpgr
         emit Mint(msg.sender, goldAmount);
     }
 
-    /**
-     * @notice Burns GLD from the caller and removes them from the lottery if their balance falls below the threshold
-     * @param amount Amount of GLD to burn
-     */
+    /// @inheritdoc IGoldToken
     function burn(uint256 amount) external override whenNotPaused {
         _burn(msg.sender, amount);
         if (balanceOf(msg.sender) <= _minimumGoldToBlock) {
@@ -167,12 +163,7 @@ contract GoldToken is Initializable, ERC20PausableUpgradeable, AccessControlUpgr
         }
     }
 
-    /**
-     * @notice Transfers GLD and keeps lottery eligibility data in sync for sender and recipient
-     * @param to Recipient address
-     * @param amount Amount of GLD to transfer
-     * @return True when the transfer succeeds
-     */
+    /// @inheritdoc IGoldToken
     function transfer(address to, uint256 amount) public override(ERC20Upgradeable, IGoldToken) returns (bool) {
         if (amount == 0) {
             revert AmountMustBeGreaterThanZero();
@@ -209,7 +200,7 @@ contract GoldToken is Initializable, ERC20PausableUpgradeable, AccessControlUpgr
                              VIEW FUNCTIONS
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice Returns the Chainlink-derived price of one gram of gold in ETH (18 decimals)
+    /// @inheritdoc IGoldToken
     function getGoldPriceInEth() public view override returns (int256) {
         (, int256 goldUsdPerTroyOunce,,,) = _dataFeedGold.latestRoundData(); // Price per troy ounce (31.1034768 g) = x USD (8 decimals)
         int256 goldUsdPerGram = (goldUsdPerTroyOunce * 10_000_000) / 311_034_768; // Multiply first to preserve precision
@@ -218,22 +209,22 @@ contract GoldToken is Initializable, ERC20PausableUpgradeable, AccessControlUpgr
         return goldUsdPerGram * 10 ** 8 / ethUsd; // Multiply first to preserve precision
     }
 
-    /// @notice Returns the current protocol fee percentage
+    /// @inheritdoc IGoldToken
     function getFees() external view override returns (uint256) {
         return _fees;
     }
 
-    /// @notice Returns the address receiving protocol fees
+    /// @inheritdoc IGoldToken
     function getFeesAddress() external view override returns (address) {
         return _feesAddress;
     }
 
-    /// @notice Returns the list of addresses currently considered for lottery eligibility
+    /// @inheritdoc IGoldToken
     function getUsers() external view override returns (address[] memory) {
         return _users;
     }
 
-    /// @notice Returns the tracked users and their associated lottery eligibility timestamps
+    /// @inheritdoc IGoldToken
     function getTimestamps() external view override returns (address[] memory, uint256[] memory) {
         uint256 length = _users.length;
         uint256[] memory timestamps = new uint256[](length);

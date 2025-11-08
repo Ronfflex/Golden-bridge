@@ -12,10 +12,15 @@ import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/U
 
 /**
  * @title Lotterie
+ * @notice Lottery system leveraging Chainlink VRF to reward GoldToken holders
  * @dev This contract manages a lottery system where users can participate and win rewards.
  * It utilizes Chainlink VRF for randomness and Access Control for owner management.
  */
 contract Lotterie is Initializable, AccessControlUpgradeable, UUPSUpgradeable, VRFConsumerBaseV2Plus, ILotterie {
+    /*//////////////////////////////////////////////////////////////
+                            STATE VARIABLES
+    //////////////////////////////////////////////////////////////*/
+
     bytes32 public constant OWNER_ROLE = keccak256("OWNER_ROLE");
     uint256 private constant ROLL_IN_PROGRESS = 42;
 
@@ -32,23 +37,16 @@ contract Lotterie is Initializable, AccessControlUpgradeable, UUPSUpgradeable, V
     mapping(uint256 => address) internal _results;
     mapping(address => uint256) internal _gains;
 
-    error TransferFailed();
+    /*//////////////////////////////////////////////////////////////
+                       CONSTRUCTOR & INITIALIZER
+    //////////////////////////////////////////////////////////////*/
 
+    /// @notice Locks the implementation contract
     constructor(address vrfCoordinator) VRFConsumerBaseV2Plus(vrfCoordinator) {
         _disableInitializers();
     }
 
-    /**
-     * @dev Initializes the contract with the necessary parameters.
-     * @param owner The address of the owner.
-     * @param vrfSubscriptionId The subscription ID for Chainlink VRF.
-     * @param vrfCoordinator The address of the VRF coordinator.
-     * @param keyHash The key hash for the VRF.
-     * @param callbackGasLimit The gas limit for the callback.
-     * @param requestConfirmations The number of confirmations for the request.
-     * @param numWords The number of random words to request.
-     * @param goldToken The address of the gold token contract.
-     */
+    /// @inheritdoc ILotterie
     function initialize(
         address owner,
         uint256 vrfSubscriptionId,
@@ -62,6 +60,7 @@ contract Lotterie is Initializable, AccessControlUpgradeable, UUPSUpgradeable, V
         __AccessControl_init();
 
         _grantRole(OWNER_ROLE, owner);
+
         _setRoleAdmin(OWNER_ROLE, OWNER_ROLE);
 
         _vrfSubscriptionId = vrfSubscriptionId;
@@ -75,33 +74,66 @@ contract Lotterie is Initializable, AccessControlUpgradeable, UUPSUpgradeable, V
         _goldToken = IGoldToken(goldToken);
     }
 
-    /**
-     * @dev Authorizes the upgrade of the contract.
-     * @param newImplementation The address of the new implementation.
-     */
     function _authorizeUpgrade(address newImplementation) internal override onlyRole(OWNER_ROLE) {}
 
-    /**
-     * @dev Adds a new owner to the contract.
-     * @param account The address of the new owner.
-     */
+    /*//////////////////////////////////////////////////////////////
+                            OWNER FUNCTIONS
+    //////////////////////////////////////////////////////////////*/
+
+    /// @inheritdoc ILotterie
     function addOwner(address account) external override onlyRole(OWNER_ROLE) {
         grantRole(OWNER_ROLE, account);
     }
 
-    /**
-     * @dev Removes an owner from the contract.
-     * @param account The address of the owner to be removed.
-     */
+    /// @inheritdoc ILotterie
     function removeOwner(address account) external override onlyRole(OWNER_ROLE) {
         revokeRole(OWNER_ROLE, account);
     }
 
-    /**
-     * @dev Initiates a random draw for the lottery.
-     * @return requestId The ID of the request for random words.
-     * @notice Can only be called by an account with the OWNER_ROLE.
-     */
+    /*//////////////////////////////////////////////////////////////
+                            ADMIN FUNCTIONS
+    //////////////////////////////////////////////////////////////*/
+
+    /// @inheritdoc ILotterie
+    function setVrfSubscriptionId(uint256 vrfSubscriptionId) external override onlyRole(OWNER_ROLE) {
+        _vrfSubscriptionId = vrfSubscriptionId;
+    }
+
+    /// @inheritdoc ILotterie
+    function setVrfCoordinator(address vrfCoordinator) external override onlyRole(OWNER_ROLE) {
+        s_vrfCoordinator = IVRFCoordinatorV2Plus(vrfCoordinator);
+    }
+
+    /// @inheritdoc ILotterie
+    function setKeyHash(bytes32 keyHash) external override onlyRole(OWNER_ROLE) {
+        _vrfKeyHash = keyHash;
+    }
+
+    /// @inheritdoc ILotterie
+    function setCallbackGasLimit(uint32 callbackGasLimit) external override onlyRole(OWNER_ROLE) {
+        _callbackGasLimit = callbackGasLimit;
+    }
+
+    /// @inheritdoc ILotterie
+    function setRequestConfirmations(uint16 requestConfirmations) external override onlyRole(OWNER_ROLE) {
+        _requestConfirmations = requestConfirmations;
+    }
+
+    /// @inheritdoc ILotterie
+    function setNumWords(uint32 numWords) external override onlyRole(OWNER_ROLE) {
+        _numWords = numWords;
+    }
+
+    /// @inheritdoc ILotterie
+    function setGoldToken(address goldToken) external override onlyRole(OWNER_ROLE) {
+        _goldToken = IGoldToken(goldToken);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                            CORE FUNCTIONS
+    //////////////////////////////////////////////////////////////*/
+
+    /// @inheritdoc ILotterie
     function randomDraw() external override onlyRole(OWNER_ROLE) returns (uint256 requestId) {
         if (_lastRandomDraw + 1 days > block.timestamp) {
             revert OneRandomDrawPerDay();
@@ -124,28 +156,18 @@ contract Lotterie is Initializable, AccessControlUpgradeable, UUPSUpgradeable, V
         emit RandomDrawed(requestId);
     }
 
-    /**
-     * @dev Callback function that is called by Chainlink VRF with the random words.
-     * @param requestId The ID of the request for random words.
-     * @param randomWords The array of random words returned by Chainlink VRF.
-     */
     function fulfillRandomWords(uint256 requestId, uint256[] calldata randomWords) internal override {
         // transform the result to a number between 0 and number of participants
         address[] memory users = _goldToken.getUsers();
         uint256 index = (randomWords[0] % users.length);
 
-        // store the result
         _results[requestId] = users[index];
         _gains[users[index]] = _goldToken.balanceOf(address(this));
 
-        // emit event
         emit Winner(users[index]);
     }
 
-    /**
-     * @dev Allows users to claim their gains from the lottery.
-     * @notice Reverts if the caller has no gains to claim.
-     */
+    /// @inheritdoc ILotterie
     function claim() external override {
         uint256 amount = _gains[msg.sender];
         if (amount == 0) {
@@ -158,19 +180,12 @@ contract Lotterie is Initializable, AccessControlUpgradeable, UUPSUpgradeable, V
         }
     }
 
-    /**
-     * @dev Checks if an account has the owner role.
-     * @param account The address to check.
-     * @return True if the account has the owner role, false otherwise.
-     */
+    /// @inheritdoc ILotterie
     function hasOwnerRole(address account) external view override returns (bool) {
         return hasRole(OWNER_ROLE, account);
     }
 
-    /**
-     * @dev Gets the last request ID for random words.
-     * @return The last request ID.
-     */
+    /// @inheritdoc ILotterie
     function getLastRequestId() external view override returns (uint256) {
         if (_requestIds.length == 0) {
             return 0;
@@ -178,140 +193,48 @@ contract Lotterie is Initializable, AccessControlUpgradeable, UUPSUpgradeable, V
         return _requestIds[_requestIds.length - 1];
     }
 
-    /**
-     * @dev Gets the gains of a specific account.
-     * @param account The address of the account.
-     * @return The amount of gains for the account.
-     */
+    /// @inheritdoc ILotterie
     function getGains(address account) external view override returns (uint256) {
         return _gains[account];
     }
 
-    /**
-     * @dev Gets the result of a specific request ID.
-     * @param requestId The ID of the request.
-     * @return The address of the winner for the request ID.
-     */
+    /// @inheritdoc ILotterie
     function getResults(uint256 requestId) external view override returns (address) {
         return _results[requestId];
     }
 
-    /**
-     * @dev Gets the address of the VRF coordinator.
-     * @return The address of the VRF coordinator.
-     */
+    /// @inheritdoc ILotterie
     function getVrfCoordinator() external view override returns (address) {
         return address(s_vrfCoordinator);
     }
 
-    /**
-     * @dev Gets the key hash used for VRF.
-     * @return The key hash.
-     */
+    /// @inheritdoc ILotterie
     function getKeyHash() external view override returns (bytes32) {
         return _vrfKeyHash;
     }
 
-    /**
-     * @dev Gets the callback gas limit.
-     * @return The callback gas limit.
-     */
+    /// @inheritdoc ILotterie
     function getCallbackGasLimit() external view override returns (uint32) {
         return _callbackGasLimit;
     }
 
-    /**
-     * @dev Gets the number of request confirmations.
-     * @return The number of request confirmations.
-     */
+    /// @inheritdoc ILotterie
     function getRequestConfirmations() external view override returns (uint16) {
         return _requestConfirmations;
     }
 
-    /**
-     * @dev Gets the number of words requested from VRF.
-     * @return The number of words.
-     */
+    /// @inheritdoc ILotterie
     function getNumWords() external view override returns (uint32) {
         return _numWords;
     }
 
-    /**
-     * @dev Gets the address of the gold token contract.
-     * @return The address of the gold token.
-     */
+    /// @inheritdoc ILotterie
     function getGoldToken() external view override returns (address) {
         return address(_goldToken);
     }
 
-    /**
-     * @dev Gets the subscription ID for Chainlink VRF.
-     * @return The VRF subscription ID.
-     */
+    /// @inheritdoc ILotterie
     function getVrfSubscriptionId() external view override returns (uint256) {
         return _vrfSubscriptionId;
-    }
-
-    /**
-     * @dev Sets a new subscription ID for Chainlink VRF.
-     * @param vrfSubscriptionId The new VRF subscription ID.
-     * @notice Can only be called by an account with the OWNER_ROLE.
-     */
-    function setVrfSubscriptionId(uint256 vrfSubscriptionId) external override onlyRole(OWNER_ROLE) {
-        _vrfSubscriptionId = vrfSubscriptionId;
-    }
-
-    /**
-     * @dev Sets a new VRF coordinator address.
-     * @param vrfCoordinator The new VRF coordinator address.
-     * @notice Can only be called by an account with the OWNER_ROLE.
-     */
-    function setVrfCoordinator(address vrfCoordinator) external override onlyRole(OWNER_ROLE) {
-        s_vrfCoordinator = IVRFCoordinatorV2Plus(vrfCoordinator);
-    }
-
-    /**
-     * @dev Sets a new key hash for VRF.
-     * @param keyHash The new key hash.
-     * @notice Can only be called by an account with the OWNER_ROLE.
-     */
-    function setKeyHash(bytes32 keyHash) external override onlyRole(OWNER_ROLE) {
-        _vrfKeyHash = keyHash;
-    }
-
-    /**
-     * @dev Sets a new callback gas limit.
-     * @param callbackGasLimit The new callback gas limit.
-     * @notice Can only be called by an account with the OWNER_ROLE.
-     */
-    function setCallbackGasLimit(uint32 callbackGasLimit) external override onlyRole(OWNER_ROLE) {
-        _callbackGasLimit = callbackGasLimit;
-    }
-
-    /**
-     * @dev Sets a new number of request confirmations.
-     * @param requestConfirmations The new number of request confirmations.
-     * @notice Can only be called by an account with the OWNER_ROLE.
-     */
-    function setRequestConfirmations(uint16 requestConfirmations) external override onlyRole(OWNER_ROLE) {
-        _requestConfirmations = requestConfirmations;
-    }
-
-    /**
-     * @dev Sets a new number of words to request from VRF.
-     * @param numWords The new number of words.
-     * @notice Can only be called by an account with the OWNER_ROLE.
-     */
-    function setNumWords(uint32 numWords) external override onlyRole(OWNER_ROLE) {
-        _numWords = numWords;
-    }
-
-    /**
-     * @dev Sets a new gold token address.
-     * @param goldToken The new gold token address.
-     * @notice Can only be called by an account with the OWNER_ROLE.
-     */
-    function setGoldToken(address goldToken) external override onlyRole(OWNER_ROLE) {
-        _goldToken = IGoldToken(goldToken);
     }
 }

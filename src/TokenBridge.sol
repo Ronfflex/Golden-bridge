@@ -99,12 +99,8 @@ contract TokenBridge is
     }
 
     /**
-     * @notice Initializes the bridge with router, token addresses, and destination chain
-     * @dev Sets up initial chain configuration with default parameters
-     * @param owner Admin address for the contract
-     * @param _link Address of the LINK token contract
-     * @param _goldToken Address of the GoldToken contract
-     * @param _destinationChainSelector Selector for the destination chain
+     * @inheritdoc ITokenBridge
+     * @dev Sets up initial chain configuration with default CCIP gas parameters for the destination chain
      */
     function initialize(address owner, address _link, address _goldToken, uint64 _destinationChainSelector)
         public
@@ -176,14 +172,7 @@ contract TokenBridge is
                             BRIDGE FUNCTIONS
     //////////////////////////////////////////////////////////////*/
 
-    /**
-     * @notice Bridges tokens to the destination chain
-     * @dev Handles both LINK and native token fee payments
-     * @param receiver Address receiving tokens on destination chain
-     * @param amount Amount of tokens to bridge
-     * @param payFeesIn Specifies fee payment method (LINK or native)
-     * @return messageId Unique identifier for the bridge transaction
-     */
+    /// @inheritdoc ITokenBridge
     function bridgeTokens(address receiver, uint256 amount, PayFeesIn payFeesIn)
         external
         payable
@@ -308,13 +297,7 @@ contract TokenBridge is
                             ADMIN FUNCTIONS
     //////////////////////////////////////////////////////////////*/
 
-    /**
-     * @notice Updates chain whitelist status and configuration
-     * @dev Sets chain status and CCIP message parameters
-     * @param chainSelector The chain selector to update
-     * @param enabled Whether to enable or disable the chain
-     * @param ccipExtraArgs CCIP message configuration for the chain
-     */
+    /// @inheritdoc ITokenBridge
     function setWhitelistedChain(uint64 chainSelector, bool enabled, bytes memory ccipExtraArgs)
         external
         override
@@ -331,11 +314,7 @@ contract TokenBridge is
         }
     }
 
-    /**
-     * @notice Updates sender whitelist status
-     * @param sender The sender address to update
-     * @param enabled Whether to enable or disable the sender
-     */
+    /// @inheritdoc ITokenBridge
     function setWhitelistedSender(address sender, bool enabled) external override onlyRole(OWNER_ROLE) {
         if (sender == address(0)) revert InvalidSender(sender);
         whitelistedSenders[sender] = enabled;
@@ -369,10 +348,7 @@ contract TokenBridge is
     /// @notice Allows the contract to receive native tokens
     receive() external payable {}
 
-    /**
-     * @notice Withdraws native tokens from the contract
-     * @param beneficiary Address to receive the withdrawn tokens
-     */
+    /// @inheritdoc ITokenBridge
     function withdraw(address beneficiary) external override onlyRole(OWNER_ROLE) nonReentrant {
         uint256 amount = address(this).balance;
         if (amount == 0) revert InvalidAmount(0);
@@ -382,11 +358,7 @@ contract TokenBridge is
         if (!sent) revert FailedToWithdrawEth(msg.sender, beneficiary, amount);
     }
 
-    /**
-     * @notice Withdraws ERC20 tokens from the contract
-     * @param beneficiary Address to receive the withdrawn tokens
-     * @param token Address of the token to withdraw
-     */
+    /// @inheritdoc ITokenBridge
     function withdrawToken(address beneficiary, address token) external override onlyRole(OWNER_ROLE) nonReentrant {
         if (beneficiary == address(0)) revert InvalidSender(address(0));
         if (token == address(0)) revert InvalidSender(address(0));
@@ -401,27 +373,17 @@ contract TokenBridge is
                              VIEW FUNCTIONS
     //////////////////////////////////////////////////////////////*/
 
-    /**
-     * @notice Checks if a chain is whitelisted
-     * @param chainSelector The chain selector to check
-     * @return bool True if the chain is whitelisted
-     */
+    /// @inheritdoc ITokenBridge
     function whitelistedChains(uint64 chainSelector) external view override returns (bool) {
         return _chainDetails[chainSelector].isEnabled;
     }
 
-    /**
-     * @notice Gets the contract's LINK token balance
-     * @return uint256 The contract's LINK token balance
-     */
+    /// @inheritdoc ITokenBridge
     function getLinkBalance() external view override returns (uint256) {
         return IERC20(link).balanceOf(address(this));
     }
 
-    /**
-     * @notice Gets the contract's GoldToken balance
-     * @return uint256 The contract's GoldToken balance
-     */
+    /// @inheritdoc ITokenBridge
     function getGoldTokenBalance() external view override returns (uint256) {
         return IERC20(goldToken).balanceOf(address(this));
     }
