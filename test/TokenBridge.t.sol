@@ -13,7 +13,7 @@ import {Client} from "@chainlink/contracts/src/v0.8/ccip/libraries/Client.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import {TestLinkToken} from "./mocks/TestLinkToken.sol";
+import {TestLinkToken} from "./mock/TestLinkToken.sol";
 
 contract TokenBridgeTest is Test {
     // Constants for roles and chain selectors
