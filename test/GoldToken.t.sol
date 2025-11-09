@@ -5,6 +5,7 @@ import {Test} from "forge-std/Test.sol";
 import {GoldToken} from "../src/GoldToken.sol";
 import {IGoldToken} from "../src/interfaces/IGoldToken.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
+import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {MockV3Aggregator} from "@chainlink/contracts/src/v0.8/tests/MockV3Aggregator.sol";
 
 contract GoldTokenTest is Test {
@@ -163,6 +164,40 @@ contract GoldTokenTest is Test {
     function _expectedGoldPriceInEth(int256 goldUsdPerTroyOunce, int256 ethUsd) internal pure returns (int256) {
         int256 goldUsdPerGram = (goldUsdPerTroyOunce * 10_000_000) / 311_034_768;
         return (goldUsdPerGram * 10 ** 8) / ethUsd;
+    }
+
+    function test_mint_reverts_on_invalid_gold_price() public {
+        // set gold feed to 0 so getGoldPriceInEth() <= 0
+        goldAggregator.updateAnswer(int256(0));
+        vm.expectRevert(IGoldToken.InvalidGoldPrice.selector);
+        goldToken.mint{value: 1 ether}();
+    }
+
+    function test_mint_reverts_when_goldAmount_is_zero() public {
+        // set an extremely large gold price so a tiny deposit yields 0 GLD
+        // MockV3Aggregator uses 8 decimals, so use a very large value
+        goldAggregator.updateAnswer(int256(10 ** 18));
+        vm.expectRevert(IGoldToken.AmountMustBeGreaterThanZero.selector);
+        goldToken.mint{value: 1}(); // 1 wei should produce 0 GLD at that price
+    }
+
+    function test_upgradeTo_succeeds_for_owner() public {
+        GoldToken newImpl = new GoldToken();
+
+        UUPSUpgradeable(address(goldToken)).upgradeToAndCall(address(newImpl), "");
+    }
+
+    function test_upgradeTo_reverts_for_non_owner() public {
+        GoldToken newImpl = new GoldToken();
+        address nonOwner = address(0x9);
+
+        vm.prank(nonOwner);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                bytes4(keccak256("AccessControlUnauthorizedAccount(address,bytes32)")), nonOwner, OWNER_ROLE
+            )
+        );
+        UUPSUpgradeable(address(goldToken)).upgradeToAndCall(address(newImpl), "");
     }
 
     fallback() external payable {}

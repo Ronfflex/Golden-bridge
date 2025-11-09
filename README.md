@@ -123,14 +123,14 @@ forge script script/deployGoldToken.sol --rpc-url $SEPOLIA_RPC --broadcast --ver
 
 ## Tests & Coverage
 
+[![codecov](https://codecov.io/github/Ronfflex/Golden-bridge/graph/badge.svg?token=N4EE30XUWF)](https://codecov.io/github/Ronfflex/Golden-bridge)
+
 All core features (mint, burn, fee distribution, VRF lottery, CCIP bridging) are covered with Foundry tests.
 A coverage report is generated with:
 
 ```
 forge coverage
 ```
-[![codecov](https://codecov.io/github/Ronfflex/Golden-bridge/graph/badge.svg?token=N4EE30XUWF)](https://codecov.io/github/Ronfflex/Golden-bridge)
-![Coverage Report](coverage_results.png)
 
 ## Tokenomics
 
