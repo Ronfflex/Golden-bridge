@@ -6,6 +6,7 @@ import {Lotterie} from "../src/Lotterie.sol";
 import {ILotterie} from "../src/interfaces/ILotterie.sol";
 import {GoldToken} from "../src/GoldToken.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
+import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {VRFCoordinatorV2_5Mock} from "@chainlink/contracts/src/v0.8/vrf/mocks/VRFCoordinatorV2_5Mock.sol";
 import {MockV3Aggregator} from "@chainlink/contracts/src/v0.8/tests/MockV3Aggregator.sol";
 
@@ -20,6 +21,7 @@ contract LotterieTest is Test {
     VRFCoordinatorV2_5Mock public vrfCoordinator;
 
     function setUp() public {
+        vm.deal(address(this), 100 ether);
         // Advance time by 2 days to avoid underflow issues with last random draw time (set during initialization to block.timestamp - 1 days)
         vm.warp(block.timestamp + 2 days);
 
@@ -90,6 +92,56 @@ contract LotterieTest is Test {
         lotterie.randomDraw();
     }
 
+    function test_randomDrawFulfillmentAndClaimFlow() public {
+        vm.warp(block.timestamp + 1 days);
+        goldToken.mint{value: 1 ether}();
+        uint256 requestId = lotterie.randomDraw();
+
+        assertEq(lotterie.getLastRequestId(), requestId, "last request id should match the recent draw");
+
+        uint256 lotterieBalanceBefore = goldToken.balanceOf(address(lotterie));
+        assertTrue(lotterieBalanceBefore > 0, "lottery should hold rewards before fulfillment");
+
+        vrfCoordinator.fulfillRandomWords(requestId, address(lotterie));
+
+        address winner = lotterie.getResults(requestId);
+        assertTrue(winner != address(0), "winner should not be the zero address");
+
+        uint256 gains = lotterie.getGains(winner);
+        assertEq(gains, lotterieBalanceBefore, "gains should equal the lottery balance");
+
+        uint256 winnerBalanceBefore = goldToken.balanceOf(winner);
+
+        vm.prank(winner);
+        lotterie.claim();
+
+        assertEq(lotterie.getGains(winner), 0, "gains should reset after claim");
+        assertEq(goldToken.balanceOf(winner), winnerBalanceBefore + gains, "winner balance should increase by gains");
+        assertEq(
+            goldToken.balanceOf(address(lotterie)),
+            lotterieBalanceBefore - gains,
+            "lottery balance should decrease by distributed gains"
+        );
+    }
+
+    function test_claim_reverts_when_transfer_fails() public {
+        vm.warp(block.timestamp + 1 days);
+        goldToken.mint{value: 1 ether}();
+        uint256 requestId = lotterie.randomDraw();
+        vrfCoordinator.fulfillRandomWords(requestId, address(lotterie));
+
+        address winner = lotterie.getResults(requestId);
+        uint256 gains = lotterie.getGains(winner);
+
+        vm.mockCall(
+            address(goldToken), abi.encodeWithSelector(GoldToken.transfer.selector, winner, gains), abi.encode(false)
+        );
+
+        vm.prank(winner);
+        vm.expectRevert(ILotterie.TransferFailed.selector);
+        lotterie.claim();
+    }
+
     function test_claim() public {
         vm.expectRevert(ILotterie.NoGainToClaim.selector);
         lotterie.claim();
@@ -151,5 +203,24 @@ contract LotterieTest is Test {
     function test_getResults() public view {
         address results = lotterie.getResults(0);
         assertEq(results, address(0), "results should be 0");
+    }
+
+    function test_upgradeTo_succeeds_for_owner() public {
+        Lotterie newImplementation = new Lotterie(address(vrfCoordinator));
+
+        UUPSUpgradeable(address(lotterie)).upgradeToAndCall(address(newImplementation), "");
+    }
+
+    function test_upgradeTo_reverts_for_non_owner() public {
+        Lotterie newImplementation = new Lotterie(address(vrfCoordinator));
+        address nonOwner = address(0x9);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                bytes4(keccak256("AccessControlUnauthorizedAccount(address,bytes32)")), nonOwner, lotterie.OWNER_ROLE()
+            )
+        );
+        vm.prank(nonOwner);
+        UUPSUpgradeable(address(lotterie)).upgradeToAndCall(address(newImplementation), "");
     }
 }
