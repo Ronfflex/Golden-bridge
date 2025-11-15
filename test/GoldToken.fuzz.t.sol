@@ -7,6 +7,7 @@ import {IGoldToken} from "../src/interfaces/IGoldToken.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {MockV3Aggregator} from "@chainlink/contracts/src/v0.8/tests/MockV3Aggregator.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
+import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 
 contract GoldTokenFuzzTest is Test {
     GoldToken public goldToken;
@@ -252,6 +253,111 @@ contract GoldTokenFuzzTest is Test {
 
         // Total minted should not exceed the raw calculation (before fees are subtracted)
         assertLe(totalMinted, maxExpected, "Should not mint more than calculated amount");
+    }
+
+    /// @notice Fuzz test ensuring user registry remains unique and timestamps stay populated
+    function testFuzz_userRegistryIntegrity(address[5] memory users, uint96[5] memory amounts) public {
+        for (uint256 i = 0; i < users.length; i++) {
+            if (users[i] == address(0) || users[i] == LOTTERIE_ADDRESS || users[i] == FEES_ADDRESS) {
+                continue;
+            }
+
+            // Ensure deterministic order by skipping duplicates that appear earlier in the array
+            bool duplicate = false;
+            for (uint256 j = 0; j < i; j++) {
+                if (users[i] == users[j]) {
+                    duplicate = true;
+                    break;
+                }
+            }
+            if (duplicate) continue;
+
+            uint256 amount = bound(amounts[i], 0.02 ether, 200 ether);
+            vm.deal(users[i], amount);
+            vm.prank(users[i]);
+            goldToken.mint{value: amount}();
+        }
+
+        (address[] memory trackedUsers, uint256[] memory timestamps) = goldToken.getTimestamps();
+
+        for (uint256 i = 0; i < trackedUsers.length; i++) {
+            address user = trackedUsers[i];
+            assertEq(user != address(0), true, "Tracked user cannot be zero");
+            assertGt(timestamps[i], 0, "Timestamp should be initialized");
+            assertGt(goldToken.balanceOf(user), 0, "Tracked user must hold GLD");
+
+            for (uint256 j = i + 1; j < trackedUsers.length; j++) {
+                assertTrue(trackedUsers[j] != user, "User list must not contain duplicates");
+            }
+        }
+    }
+
+    /// @notice Fuzz test fee accounting remains consistent with 5% fee split
+    function testFuzz_mint_feeAccounting(uint96 ethAmount) public {
+        vm.assume(ethAmount > 0.05 ether);
+        vm.assume(ethAmount < 200 ether);
+
+        int256 goldPriceInEth = goldToken.getGoldPriceInEth();
+        vm.assume(goldPriceInEth > 0);
+
+        uint256 goldPriceScaled = uint256(goldPriceInEth) * 10 ** 10;
+        uint256 rawGoldAmount = Math.mulDiv(ethAmount, 10 ** 18, goldPriceScaled);
+        vm.assume(rawGoldAmount > 0);
+
+        uint256 expectedFee = rawGoldAmount * 5 / 100;
+        vm.assume(expectedFee > 0);
+        uint256 expectedUserAmount = rawGoldAmount - expectedFee;
+        uint256 expectedLotterie = expectedFee / 2;
+        uint256 expectedFeesAddress = expectedFee - expectedLotterie;
+
+        vm.deal(address(this), ethAmount);
+        uint256 userBefore = goldToken.balanceOf(address(this));
+        uint256 lotterieBefore = goldToken.balanceOf(LOTTERIE_ADDRESS);
+        uint256 feesBefore = goldToken.balanceOf(FEES_ADDRESS);
+
+        goldToken.mint{value: ethAmount}();
+
+        uint256 userDelta = goldToken.balanceOf(address(this)) - userBefore;
+        uint256 lotterieDelta = goldToken.balanceOf(LOTTERIE_ADDRESS) - lotterieBefore;
+        uint256 feesDelta = goldToken.balanceOf(FEES_ADDRESS) - feesBefore;
+
+        assertApproxEqAbs(userDelta, expectedUserAmount, 1, "User mint amount mismatch");
+        assertApproxEqAbs(lotterieDelta, expectedLotterie, 1, "Lotterie fee share mismatch");
+        assertApproxEqAbs(feesDelta, expectedFeesAddress, 1, "Fees address share mismatch");
+    }
+
+    /// @notice Fuzz test ensures minting respects the minimum deposit implied by price feeds
+    function testFuzz_mint_respectsMinimumDeposit(uint96 ethAmount) public {
+        vm.assume(ethAmount > 0);
+        vm.assume(ethAmount < 10 ether);
+
+        vm.deal(address(this), ethAmount);
+
+        int256 goldPriceInEth = goldToken.getGoldPriceInEth();
+        vm.assume(goldPriceInEth > 0);
+        uint256 goldPriceScaled = uint256(goldPriceInEth) * 10 ** 10;
+        uint256 minDeposit = (goldPriceScaled + 10 ** 18 - 1) / 10 ** 18;
+
+        if (ethAmount < minDeposit) {
+            vm.expectRevert(IGoldToken.AmountMustBeGreaterThanZero.selector);
+            goldToken.mint{value: ethAmount}();
+        } else {
+            goldToken.mint{value: ethAmount}();
+        }
+    }
+
+    /// @notice Fuzz test ensures paused state blocks minting
+    function testFuzz_pauseBlocksMint(uint96 ethAmount) public {
+        vm.assume(ethAmount > 0.05 ether);
+        vm.assume(ethAmount < 100 ether);
+
+        vm.deal(address(this), ethAmount);
+        goldToken.pause();
+
+        vm.expectRevert(PausableUpgradeable.EnforcedPause.selector);
+        goldToken.mint{value: ethAmount}();
+
+        goldToken.unpause();
     }
 
     receive() external payable {}

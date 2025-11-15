@@ -227,5 +227,77 @@ contract LotterieFuzzTest is Test {
         assertTrue(isValidWinner, "Winner must be from the user pool");
     }
 
+    /// @notice Fuzz test that gains snapshot matches Lotterie GLD balance
+    function testFuzz_gainsMatchesBalance(uint96 mintAmount) public {
+        mintAmount = uint96(bound(mintAmount, 0.05 ether, 5 ether));
+
+        address user1 = address(0x4001);
+        address user2 = address(0x4002);
+
+        vm.deal(user1, mintAmount);
+        vm.prank(user1);
+        goldToken.mint{value: mintAmount}();
+
+        vm.deal(user2, mintAmount);
+        vm.prank(user2);
+        goldToken.mint{value: mintAmount}();
+
+        vm.warp(block.timestamp + 1 days);
+        uint256 balanceBefore = goldToken.balanceOf(address(lotterie));
+        vm.assume(balanceBefore > 0);
+
+        uint256 requestId = lotterie.randomDraw();
+        vrfCoordinator.fulfillRandomWords(requestId, address(lotterie));
+
+        address winner = lotterie.getResults(requestId);
+        uint256 gains = lotterie.getGains(winner);
+        assertEq(gains, balanceBefore, "Gains should equal Lotterie balance snapshot");
+    }
+
+    /// @notice Fuzz test switching the GoldToken source updates participant pool
+    function testFuzz_setGoldTokenSwitchesSource(uint96 mintAmount1, uint96 mintAmount2) public {
+        mintAmount1 = uint96(bound(mintAmount1, 0.05 ether, 5 ether));
+        mintAmount2 = uint96(bound(mintAmount2, 0.05 ether, 5 ether));
+
+        GoldToken newImplementation = new GoldToken();
+        ERC1967Proxy newProxy = new ERC1967Proxy(
+            address(newImplementation),
+            abi.encodeWithSelector(GoldToken.initialize.selector, address(this), address(mockGold), address(mockEth))
+        );
+        GoldToken newGoldToken = GoldToken(address(newProxy));
+        newGoldToken.setLotterieAddress(address(lotterie));
+
+        lotterie.setGoldToken(address(newGoldToken));
+
+        address userA = address(0x5001);
+        address userB = address(0x5002);
+
+        vm.deal(userA, mintAmount1);
+        vm.prank(userA);
+        newGoldToken.mint{value: mintAmount1}();
+
+        vm.deal(userB, mintAmount2);
+        vm.prank(userB);
+        newGoldToken.mint{value: mintAmount2}();
+
+        vm.warp(block.timestamp + 1 days);
+        uint256 requestId = lotterie.randomDraw();
+        vrfCoordinator.fulfillRandomWords(requestId, address(lotterie));
+
+        address winner = lotterie.getResults(requestId);
+        assertTrue(winner == userA || winner == userB, "Winner must come from new GoldToken users");
+        assertEq(lotterie.getGoldToken(), address(newGoldToken), "GoldToken address should update");
+    }
+
+    /// @notice Documents that draws without users keep winner unset
+    function test_randomDraw_withoutUsersLeavesWinnerUnset() public {
+        vm.warp(block.timestamp + 1 days);
+        uint256 requestId = lotterie.randomDraw();
+
+        vrfCoordinator.fulfillRandomWords(requestId, address(lotterie));
+
+        assertEq(lotterie.getResults(requestId), address(0), "Winner should remain unset without participants");
+    }
+
     receive() external payable {}
 }
