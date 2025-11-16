@@ -5,6 +5,8 @@ import {Test} from "forge-std/Test.sol";
 import {ITokenBridge} from "../src/interfaces/ITokenBridge.sol";
 import {TokenBridge} from "../src/TokenBridge.sol";
 import {GoldToken} from "../src/GoldToken.sol";
+import {TestLinkToken} from "./mock/TestLinkToken.sol";
+import {ContractThatRejectsEth} from "./mock/ContractThatRejectsEth.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {MockLinkToken} from "@chainlink/contracts/src/v0.8/mocks/MockLinkToken.sol";
 import {MockV3Aggregator} from "@chainlink/contracts/src/v0.8/tests/MockV3Aggregator.sol";
@@ -13,7 +15,6 @@ import {Client} from "@chainlink/contracts/src/v0.8/ccip/libraries/Client.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import {TestLinkToken} from "./mock/TestLinkToken.sol";
 
 contract TokenBridgeTest is Test {
     // Constants for roles and chain selectors
@@ -687,9 +688,3 @@ contract TokenBridgeTest is Test {
     receive() external payable {}
 }
 
-// Contract that rejects ETH for test_failedEthWithdrawal
-contract ContractThatRejectsEth {
-    receive() external payable {
-        revert("I reject ETH");
-    }
-}
