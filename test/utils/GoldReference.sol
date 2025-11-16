@@ -26,6 +26,8 @@ library GoldReference {
         int256 price = calcGoldPriceInEth(goldUsdPerTroyOunce, ethUsd);
         require(price > 0, "invalid price");
 
+        // casting to uint256 is safe because price > 0 is enforced above
+        // forge-lint: disable-next-line(unsafe-typecast)
         uint256 goldPriceScaled = uint256(price) * 1e10;
         uint256 grossGold = ethAmount * 1e18 / goldPriceScaled;
         require(grossGold > 0, "zero mint");

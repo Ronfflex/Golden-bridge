@@ -102,7 +102,8 @@ contract GoldTokenFuzzTest is Test {
         uint256 senderBalanceBefore = goldToken.balanceOf(address(this));
         uint256 recipientBalanceBefore = goldToken.balanceOf(recipient);
 
-        goldToken.transfer(recipient, transferAmount);
+        bool sent = goldToken.transfer(recipient, transferAmount);
+        assertTrue(sent, "transfer should succeed");
 
         uint256 senderBalanceAfter = goldToken.balanceOf(address(this));
         uint256 recipientBalanceAfter = goldToken.balanceOf(recipient);
@@ -223,6 +224,8 @@ contract GoldTokenFuzzTest is Test {
         int256 goldPriceInEth = goldToken.getGoldPriceInEth();
         vm.assume(goldPriceInEth > 0);
 
+        // casting to uint256 is safe because goldPriceInEth > 0 is assumed above
+        // forge-lint: disable-next-line(unsafe-typecast)
         uint256 goldPriceScaled = uint256(goldPriceInEth) * 10 ** 10;
         uint256 minDeposit = (goldPriceScaled + 10 ** 18 - 1) / 10 ** 18;
         vm.assume(ethAmount >= minDeposit);
@@ -301,6 +304,8 @@ contract GoldTokenFuzzTest is Test {
         int256 goldPriceInEth = goldToken.getGoldPriceInEth();
         vm.assume(goldPriceInEth > 0);
 
+        // casting to uint256 is safe because goldPriceInEth > 0 is assumed above
+        // forge-lint: disable-next-line(unsafe-typecast)
         uint256 goldPriceScaled = uint256(goldPriceInEth) * 10 ** 10;
         uint256 rawGoldAmount = Math.mulDiv(ethAmount, 10 ** 18, goldPriceScaled);
         vm.assume(rawGoldAmount > 0);
@@ -336,6 +341,8 @@ contract GoldTokenFuzzTest is Test {
 
         int256 goldPriceInEth = goldToken.getGoldPriceInEth();
         vm.assume(goldPriceInEth > 0);
+        // casting to uint256 is safe because goldPriceInEth > 0 is assumed above
+        // forge-lint: disable-next-line(unsafe-typecast)
         uint256 goldPriceScaled = uint256(goldPriceInEth) * 10 ** 10;
         uint256 minDeposit = (goldPriceScaled + 10 ** 18 - 1) / 10 ** 18;
 
@@ -366,7 +373,11 @@ contract GoldTokenFuzzTest is Test {
         uint256 goldBounded = bound(uint256(goldUsdRaw), 100 * 1e8, 10_000 * 1e8);
         uint256 ethBounded = bound(uint256(ethUsdRaw), 100 * 1e8, 10_000 * 1e8);
 
+        // casting to int256 is safe because the bounded values fit within 256 bits
+        // forge-lint: disable-next-line(unsafe-typecast)
         int256 goldUsdPerTroyOunce = int256(goldBounded);
+        // casting to int256 is safe because the bounded values fit within 256 bits
+        // forge-lint: disable-next-line(unsafe-typecast)
         int256 ethUsd = int256(ethBounded);
 
         goldAggregator.updateAnswer(goldUsdPerTroyOunce);

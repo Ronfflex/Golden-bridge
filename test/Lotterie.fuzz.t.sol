@@ -83,6 +83,8 @@ contract LotterieFuzzTest is Test {
 
         // Create users and mint tokens
         for (uint256 i = 0; i < userCount; i++) {
+            // casting to uint160 is safe because the literal offsets are < 2**160
+            // forge-lint: disable-next-line(unsafe-typecast)
             address user = address(uint160(0x1000 + i));
             vm.deal(user, mintAmount);
             vm.prank(user);
@@ -203,6 +205,8 @@ contract LotterieFuzzTest is Test {
 
         // Create users with varying amounts
         for (uint256 i = 0; i < userCount; i++) {
+            // casting to uint160 is safe because the literal offsets are < 2**160
+            // forge-lint: disable-next-line(unsafe-typecast)
             address user = address(uint160(0x2000 + i));
             uint256 amount = 0.01 ether + (i * 0.001 ether);
             vm.deal(user, amount);
@@ -219,6 +223,8 @@ contract LotterieFuzzTest is Test {
         // Winner must be one of the users
         bool isValidWinner = false;
         for (uint256 i = 0; i < userCount; i++) {
+            // casting to uint160 is safe because the literal offsets are < 2**160
+            // forge-lint: disable-next-line(unsafe-typecast)
             if (winner == address(uint160(0x2000 + i))) {
                 isValidWinner = true;
                 break;

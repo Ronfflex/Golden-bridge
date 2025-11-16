@@ -106,7 +106,8 @@ contract TokenBridgeFuzzTest is Test {
         uint256 available = goldToken.balanceOf(address(this));
         vm.assume(amount <= available);
 
-        goldToken.transfer(address(bridge), amount);
+        bool funded = goldToken.transfer(address(bridge), amount);
+        assertTrue(funded, "fund bridge liquidity");
 
         Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](1);
         tokenAmounts[0] = Client.EVMTokenAmount({token: address(goldToken), amount: amount});
@@ -234,7 +235,8 @@ contract TokenBridgeFuzzTest is Test {
         uint256 balance = goldToken.balanceOf(address(this));
         vm.assume(withdrawAmount <= balance);
 
-        goldToken.transfer(address(bridge), withdrawAmount);
+        bool seeded = goldToken.transfer(address(bridge), withdrawAmount);
+        assertTrue(seeded, "seed bridge before withdrawal");
         uint256 bridgeBalanceBefore = goldToken.balanceOf(address(bridge));
 
         uint256 balanceBefore = goldToken.balanceOf(address(this));
@@ -269,7 +271,8 @@ contract TokenBridgeFuzzTest is Test {
         // Mint and transfer to bridge
         vm.deal(address(this), 10 ether);
         goldToken.mint{value: 10 ether}();
-        goldToken.transfer(address(bridge), amount);
+        bool deposited = goldToken.transfer(address(bridge), amount);
+        assertTrue(deposited, "deposit to bridge");
 
         Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](1);
         tokenAmounts[0] = Client.EVMTokenAmount({token: address(goldToken), amount: amount});
