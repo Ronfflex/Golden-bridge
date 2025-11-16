@@ -7,6 +7,7 @@ import {IGoldToken} from "../src/interfaces/IGoldToken.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {MockV3Aggregator} from "@chainlink/contracts/src/v0.8/tests/MockV3Aggregator.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
+import {GoldReference} from "./utils/GoldReference.sol";
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 
 contract GoldTokenFuzzTest is Test {
@@ -358,6 +359,21 @@ contract GoldTokenFuzzTest is Test {
         goldToken.mint{value: ethAmount}();
 
         goldToken.unpause();
+    }
+
+    /// @notice Differential fuzz test comparing on-chain price math with reference implementation
+    function testFuzz_goldPriceMatchesReference(uint64 goldUsdRaw, uint64 ethUsdRaw) public {
+        uint256 goldBounded = bound(uint256(goldUsdRaw), 100 * 1e8, 10_000 * 1e8);
+        uint256 ethBounded = bound(uint256(ethUsdRaw), 100 * 1e8, 10_000 * 1e8);
+
+        int256 goldUsdPerTroyOunce = int256(goldBounded);
+        int256 ethUsd = int256(ethBounded);
+
+        goldAggregator.updateAnswer(goldUsdPerTroyOunce);
+        ethAggregator.updateAnswer(ethUsd);
+
+        int256 expected = GoldReference.calcGoldPriceInEth(goldUsdPerTroyOunce, ethUsd);
+        assertEq(goldToken.getGoldPriceInEth(), expected, "price mismatch with reference implementation");
     }
 
     receive() external payable {}

@@ -7,6 +7,7 @@ import {IGoldToken} from "../src/interfaces/IGoldToken.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {MockV3Aggregator} from "@chainlink/contracts/src/v0.8/tests/MockV3Aggregator.sol";
+import {GoldReference} from "./utils/GoldReference.sol";
 
 contract GoldTokenTest is Test {
     GoldToken public goldToken;
@@ -14,6 +15,19 @@ contract GoldTokenTest is Test {
 
     MockV3Aggregator public goldAggregator;
     MockV3Aggregator public ethAggregator;
+
+    struct MintScenario {
+        uint96 ethAmount;
+        int256 goldUsdPerTroyOunce;
+        int256 ethUsd;
+    }
+
+    MintScenario[] public fixtureMintScenario;
+
+    address internal constant DEFAULT_LOTTERIE = address(10);
+    address internal constant TABLE_LOTTERIE = address(0xBEEF);
+    address internal constant TABLE_FEES = address(0xFEE);
+    address internal defaultFeesAddress;
 
     bytes32 public constant OWNER_ROLE = keccak256("OWNER_ROLE");
 
@@ -43,7 +57,26 @@ contract GoldTokenTest is Test {
             )
         );
         goldToken = GoldToken(address(proxy));
-        goldToken.setLotterieAddress(address(10));
+        goldToken.setLotterieAddress(DEFAULT_LOTTERIE);
+        defaultFeesAddress = goldToken.getFeesAddress();
+
+        fixtureMintScenario.push(
+            MintScenario({ethAmount: 1 ether, goldUsdPerTroyOunce: int256(1_200 * 1e8), ethUsd: int256(1_800 * 1e8)})
+        );
+
+        fixtureMintScenario.push(
+            MintScenario({ethAmount: 0.01 ether, goldUsdPerTroyOunce: int256(900 * 1e8), ethUsd: int256(1_600 * 1e8)})
+        );
+
+        fixtureMintScenario.push(
+            MintScenario({
+                ethAmount: 1_000 ether, goldUsdPerTroyOunce: int256(1_950 * 1e8), ethUsd: int256(1_900 * 1e8)
+            })
+        );
+
+        fixtureMintScenario.push(
+            MintScenario({ethAmount: 2 ether, goldUsdPerTroyOunce: int256(1_234 * 1e8), ethUsd: int256(1_230 * 1e8)})
+        );
     }
 
     function test_addOwner() public {
@@ -80,6 +113,34 @@ contract GoldTokenTest is Test {
 
         feesAddress = goldToken.getFeesAddress();
         assertEq(feesAddress, address(signers[0]));
+    }
+
+    /// @notice Table-driven test for various mint scenarios. Check https://getfoundry.sh/forge/advanced-testing/table-testing/ for more details.
+    function tableMintScenario(MintScenario memory mintScenario) public {
+        goldToken.setLotterieAddress(TABLE_LOTTERIE);
+        goldToken.setFeesAddress(TABLE_FEES);
+
+        goldAggregator.updateAnswer(mintScenario.goldUsdPerTroyOunce);
+        ethAggregator.updateAnswer(mintScenario.ethUsd);
+
+        vm.deal(address(this), mintScenario.ethAmount);
+
+        (uint256 expectedUser, uint256 expectedLotterie, uint256 expectedFees) = GoldReference.calcMintBreakdown(
+            mintScenario.ethAmount, mintScenario.goldUsdPerTroyOunce, mintScenario.ethUsd
+        );
+
+        uint256 userBefore = goldToken.balanceOf(address(this));
+        uint256 lotterieBefore = goldToken.balanceOf(TABLE_LOTTERIE);
+        uint256 feesBefore = goldToken.balanceOf(TABLE_FEES);
+
+        goldToken.mint{value: mintScenario.ethAmount}();
+
+        assertEq(goldToken.balanceOf(address(this)) - userBefore, expectedUser, "user mint mismatch");
+        assertEq(goldToken.balanceOf(TABLE_LOTTERIE) - lotterieBefore, expectedLotterie, "lotterie mismatch");
+        assertEq(goldToken.balanceOf(TABLE_FEES) - feesBefore, expectedFees, "fees mismatch");
+
+        goldToken.setLotterieAddress(DEFAULT_LOTTERIE);
+        goldToken.setFeesAddress(defaultFeesAddress);
     }
 
     function test_getFees() public view {
