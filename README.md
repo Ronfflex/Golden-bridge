@@ -72,11 +72,15 @@ graph TD
   ├── deployLotterie.s.sol
   ├── deployCoreContracts.s.sol
 /test
+  ├── GoldToken.fuzz.t.sol
   ├── GoldToken.t.sol
+  ├── Lotterie.fuzz.t.sol
   ├── Lotterie.t.sol
+  ├── TokenBridge.fuzz.t.sol
   ├── TokenBridge.t.sol
   ├── /mock
         ├── TestLinkToken.sol
+        ├── ContractThatRejectsEth.sol
 ```
 
 ## Smart Contract Logic
@@ -150,9 +154,9 @@ forge coverage
 
 ## Future Improvements
 
-- Implement a frontend dashboard for minting and lottery participation
+- Implement OpenZeppelin Defender for automated deploy, upgrades and monitoring
 
-- Add fuzz tests for enhanced security
+- Implement a frontend dashboard for minting and lottery participation
 
 - Submit for professional security audit
 
