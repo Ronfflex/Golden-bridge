@@ -9,6 +9,7 @@ import {IVRFCoordinatorV2Plus} from "@chainlink/contracts/src/v0.8/vrf/dev/inter
 import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 /**
  * @title Lotterie
@@ -16,11 +17,19 @@ import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/U
  * @dev This contract manages a lottery system where users can participate and win rewards.
  * It utilizes Chainlink VRF for randomness and Access Control for owner management.
  */
-contract Lotterie is Initializable, AccessControlUpgradeable, UUPSUpgradeable, VRFConsumerBaseV2Plus, ILotterie {
+contract Lotterie is
+    Initializable,
+    AccessControlUpgradeable,
+    UUPSUpgradeable,
+    VRFConsumerBaseV2Plus,
+    ReentrancyGuard,
+    ILotterie
+{
     /*//////////////////////////////////////////////////////////////
                             STATE VARIABLES
     //////////////////////////////////////////////////////////////*/
 
+    /// @notice Role identifier for operators allowed to manage draws and upgrades
     bytes32 public constant OWNER_ROLE = keccak256("OWNER_ROLE");
     uint256 private constant ROLL_IN_PROGRESS = 42;
 
@@ -56,7 +65,7 @@ contract Lotterie is Initializable, AccessControlUpgradeable, UUPSUpgradeable, V
         uint16 requestConfirmations,
         uint32 numWords,
         address goldToken
-    ) public override initializer {
+    ) external override initializer {
         __AccessControl_init();
 
         _grantRole(OWNER_ROLE, owner);
@@ -134,12 +143,12 @@ contract Lotterie is Initializable, AccessControlUpgradeable, UUPSUpgradeable, V
     //////////////////////////////////////////////////////////////*/
 
     /// @inheritdoc ILotterie
-    function randomDraw() external override onlyRole(OWNER_ROLE) returns (uint256 requestId) {
+    function randomDraw() external override onlyRole(OWNER_ROLE) returns (uint256) {
         if (_lastRandomDraw + 1 days > block.timestamp) {
             revert OneRandomDrawPerDay();
         }
 
-        requestId = s_vrfCoordinator.requestRandomWords(
+        uint256 requestId = s_vrfCoordinator.requestRandomWords(
             VRFV2PlusClient.RandomWordsRequest({
                 keyHash: _vrfKeyHash,
                 subId: _vrfSubscriptionId,
@@ -154,6 +163,7 @@ contract Lotterie is Initializable, AccessControlUpgradeable, UUPSUpgradeable, V
         _lastRandomDraw = block.timestamp;
         _requestIds.push(requestId);
         emit RandomDrawed(requestId);
+        return requestId;
     }
 
     function fulfillRandomWords(uint256 requestId, uint256[] calldata randomWords) internal override {
@@ -168,7 +178,7 @@ contract Lotterie is Initializable, AccessControlUpgradeable, UUPSUpgradeable, V
     }
 
     /// @inheritdoc ILotterie
-    function claim() external override {
+    function claim() external override nonReentrant {
         uint256 amount = _gains[msg.sender];
         if (amount == 0) {
             revert NoGainToClaim();

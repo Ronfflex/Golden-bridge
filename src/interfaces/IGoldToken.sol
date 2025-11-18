@@ -26,6 +26,8 @@ interface IGoldToken {
     error AmountMustBeGreaterThanZero();
     /// @notice Thrown when Chainlink feeds yield a non-positive gold price in ETH
     error InvalidGoldPrice();
+    /// @notice Thrown when withdrawing ETH to an owner fails
+    error EthTransferFailed();
 
     /*//////////////////////////////////////////////////////////////
                              ADMIN FUNCTIONS

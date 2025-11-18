@@ -10,7 +10,8 @@ library GoldReference {
 
     /// @notice Mirror of GoldToken.getGoldPriceInEth logic for testing
     function calcGoldPriceInEth(int256 goldUsdPerTroyOunce, int256 ethUsd) internal pure returns (int256) {
-        require(goldUsdPerTroyOunce > 0 && ethUsd > 0, "invalid feeds");
+        require(goldUsdPerTroyOunce > 0, "invalid feeds");
+        require(ethUsd > 0, "invalid feeds");
 
         int256 goldUsdPerGram = (goldUsdPerTroyOunce * 10_000_000) / 311_034_768;
         return (goldUsdPerGram * 1e8) / ethUsd;

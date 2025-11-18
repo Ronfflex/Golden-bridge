@@ -10,17 +10,26 @@ import {
 } from "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20PausableUpgradeable.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 /**
  * @title GoldToken
  * @notice ERC-20 token representing on-chain grams of gold redeemable via ETH deposits and burns
  * @dev Upgradeable (UUPS) contract that relies on Chainlink price feeds and exposes hooks for the Lotterie module
  */
-contract GoldToken is Initializable, ERC20PausableUpgradeable, AccessControlUpgradeable, UUPSUpgradeable, IGoldToken {
+contract GoldToken is
+    Initializable,
+    ERC20PausableUpgradeable,
+    AccessControlUpgradeable,
+    UUPSUpgradeable,
+    ReentrancyGuard,
+    IGoldToken
+{
     /*//////////////////////////////////////////////////////////////
                             STATE VARIABLES
     //////////////////////////////////////////////////////////////*/
 
+    /// @notice Role identifier governing privileged token operations and upgrades
     bytes32 public constant OWNER_ROLE = keccak256("OWNER_ROLE");
 
     AggregatorV3Interface internal _dataFeedGold;
@@ -45,7 +54,7 @@ contract GoldToken is Initializable, ERC20PausableUpgradeable, AccessControlUpgr
 
     /// @inheritdoc IGoldToken
     function initialize(address owner, address dataFeedGoldAddress, address dataFeedEthAddress)
-        public
+        external
         override
         initializer
     {
@@ -91,8 +100,12 @@ contract GoldToken is Initializable, ERC20PausableUpgradeable, AccessControlUpgr
     //////////////////////////////////////////////////////////////*/
 
     /// @inheritdoc IGoldToken
-    function claimEth() external override onlyRole(OWNER_ROLE) {
-        payable(msg.sender).transfer(address(this).balance);
+    function claimEth() external override onlyRole(OWNER_ROLE) nonReentrant {
+        uint256 payout = address(this).balance;
+        (bool success,) = payable(msg.sender).call{value: payout}("");
+        if (!success) {
+            revert EthTransferFailed();
+        }
     }
 
     /// @inheritdoc IGoldToken
@@ -177,9 +190,10 @@ contract GoldToken is Initializable, ERC20PausableUpgradeable, AccessControlUpgr
     }
 
     /// @dev Removes a user from the lottery pool and clears their timestamp
-    function _removeUser(address user) internal {
+    function _removeUser(address user) private {
         _timestamps[user] = 0;
-        for (uint256 i = 0; i < _users.length; i++) {
+        uint256 length = _users.length;
+        for (uint256 i; i < length; ++i) {
             if (_users[i] == user) {
                 _users[i] = _users[_users.length - 1];
                 _users.pop();
@@ -189,7 +203,7 @@ contract GoldToken is Initializable, ERC20PausableUpgradeable, AccessControlUpgr
     }
 
     /// @dev Adds a user to the lottery pool on first interaction
-    function _addUser(address user) internal {
+    function _addUser(address user) private {
         if (_timestamps[user] == 0) {
             _users.push(user);
             _timestamps[user] = block.timestamp;
@@ -228,7 +242,7 @@ contract GoldToken is Initializable, ERC20PausableUpgradeable, AccessControlUpgr
     function getTimestamps() external view override returns (address[] memory, uint256[] memory) {
         uint256 length = _users.length;
         uint256[] memory timestamps = new uint256[](length);
-        for (uint256 i = 0; i < length; i++) {
+        for (uint256 i; i < length; ++i) {
             timestamps[i] = _timestamps[_users[i]];
         }
         return (_users, timestamps);

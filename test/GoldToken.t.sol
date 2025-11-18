@@ -8,6 +8,7 @@ import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.s
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {MockV3Aggregator} from "@chainlink/contracts/src/v0.8/tests/MockV3Aggregator.sol";
 import {GoldReference} from "./utils/GoldReference.sol";
+import {ContractThatRejectsEth} from "./mock/ContractThatRejectsEth.sol";
 
 contract GoldTokenTest is Test {
     GoldToken public goldToken;
@@ -189,8 +190,28 @@ contract GoldTokenTest is Test {
     }
 
     function test_claimEth() public {
-        goldToken.mint{value: 10000}();
+        vm.deal(address(this), 1 ether);
+        uint256 ownerBalanceBefore = address(this).balance;
+        uint256 depositAmount = 0.25 ether;
+        goldToken.mint{value: depositAmount}();
+        assertEq(address(goldToken).balance, depositAmount, "contract should hold deposited ETH");
+
         goldToken.claimEth();
+
+        assertEq(address(goldToken).balance, 0, "contract balance should be zero after withdrawal");
+        assertEq(address(this).balance, ownerBalanceBefore, "owner should recover the deposited ETH");
+    }
+
+    function test_claimEth_reverts_on_failed_transfer() public {
+        ContractThatRejectsEth reverter = new ContractThatRejectsEth();
+        goldToken.addOwner(address(reverter));
+
+        vm.deal(address(this), 1 ether);
+        goldToken.mint{value: 0.1 ether}();
+        assertEq(address(goldToken).balance, 0.1 ether, "contract should hold deposited ETH");
+
+        vm.expectRevert(IGoldToken.EthTransferFailed.selector);
+        reverter.claimGoldTokenEth(goldToken);
     }
 
     function test_getUsers() public {
