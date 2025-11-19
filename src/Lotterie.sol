@@ -32,18 +32,37 @@ contract Lotterie is
     /// @notice Role identifier for operators allowed to manage draws and upgrades
     bytes32 public constant OWNER_ROLE = keccak256("OWNER_ROLE");
 
+    /// @notice Chainlink VRF subscription that funds randomness requests
     uint256 internal _vrfSubscriptionId;
+
+    /// @notice Key hash identifying the VRF proving key used for draws
     bytes32 internal _vrfKeyHash;
+
+    /// @notice Gas limit allocated to `fulfillRandomWords`
     uint32 internal _callbackGasLimit;
+
+    /// @notice Number of block confirmations required before a VRF response is accepted
     uint16 internal _requestConfirmations;
+
+    /// @notice Amount of random words requested per draw
     uint32 internal _numWords;
 
+    /// @notice GoldToken proxy feeding participant balances and payouts
     IGoldToken internal _goldToken;
 
+    /// @notice Timestamp of the most recent draw, used to enforce the daily cadence
     uint256 internal _lastRandomDraw;
+
+    /// @notice Historical record of VRF request identifiers
     uint256[] internal _requestIds;
-    mapping(uint256 => address) internal _results;
-    mapping(address => uint256) internal _gains;
+
+    /// @notice Stores winning addresses per VRF request
+    /// @dev Maps requestId => winner address
+    mapping(uint256 requestId => address winner) internal _results;
+
+    /// @notice Tracks unclaimed lottery rewards for each participant
+    /// @dev Maps account => GLD amount that can be claimed
+    mapping(address account => uint256 pendingGain) internal _gains;
 
     /*//////////////////////////////////////////////////////////////
                        CONSTRUCTOR & INITIALIZER

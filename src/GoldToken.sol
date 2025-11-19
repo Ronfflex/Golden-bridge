@@ -32,15 +32,29 @@ contract GoldToken is
     /// @notice Role identifier governing privileged token operations and upgrades
     bytes32 public constant OWNER_ROLE = keccak256("OWNER_ROLE");
 
+    /// @notice Chainlink feed returning the USD price of one troy ounce of gold
     AggregatorV3Interface internal _dataFeedGold;
+
+    /// @notice Chainlink feed returning the USD price of one ETH
     AggregatorV3Interface internal _dataFeedEth;
 
+    /// @notice Protocol fee percentage expressed in whole percents (e.g., 5 = 5%)
     uint256 internal _fees;
+
+    /// @notice Address receiving the treasury portion of mint fees
     address internal _feesAddress;
+
+    /// @notice Lotterie contract that receives half of the mint fees and manages rewards
     address internal _lotterieAddress;
 
+    /// @notice Minimum GLD balance that keeps an account eligible for lottery participation
     uint256 internal _minimumGoldToBlock;
-    mapping(address => uint256) internal _timestamps;
+
+    /// @notice Tracks the first interaction timestamp for each lottery participant
+    /// @dev Maps user address => timestamp of entry
+    mapping(address user => uint256 lastInteraction) internal _timestamps;
+
+    /// @notice Dynamic list of addresses currently eligible for lottery draws
     address[] internal _users;
 
     /*//////////////////////////////////////////////////////////////

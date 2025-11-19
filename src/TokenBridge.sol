@@ -66,15 +66,15 @@ contract TokenBridge is
 
     /// @notice Tracks processed CCIP messages to prevent duplicates
     /// @dev Maps messageId => processed status
-    mapping(bytes32 => bool) public override processedMessages;
+    mapping(bytes32 messageId => bool wasProcessed) public override processedMessages;
 
     /// @notice Stores configuration for each supported chain
     /// @dev Maps chainSelector => ChainDetails
-    mapping(uint64 => ChainDetails) private _chainDetails;
+    mapping(uint64 chainSelector => ChainDetails details) private _chainDetails;
 
     /// @notice Tracks authorized cross-chain senders
     /// @dev Maps sender address => authorization status
-    mapping(address => bool) public override whitelistedSenders;
+    mapping(address sender => bool allowed) public override whitelistedSenders;
 
     /*//////////////////////////////////////////////////////////////
                                MODIFIERS
