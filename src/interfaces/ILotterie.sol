@@ -14,7 +14,7 @@ interface ILotterie {
      * @notice Emitted whenever a VRF request for randomness is sent
      * @param requestId Unique identifier for the Chainlink VRF request
      */
-    event RandomDrawed(uint256 requestId);
+    event RandomDrawed(uint256 indexed requestId);
     /**
      * @notice Emitted when a winner is determined for the active lottery
      * @param winner Address receiving the lottery gains
@@ -48,7 +48,7 @@ interface ILotterie {
      * @param previousSubscriptionId Subscription id before the update
      * @param newSubscriptionId Subscription id after the update
      */
-    event VrfSubscriptionUpdated(uint256 previousSubscriptionId, uint256 newSubscriptionId);
+    event VrfSubscriptionUpdated(uint256 indexed previousSubscriptionId, uint256 indexed newSubscriptionId);
 
     /**
      * @notice Emitted when the VRF coordinator reference changes
@@ -62,7 +62,7 @@ interface ILotterie {
      * @param previousKeyHash Key hash before the update
      * @param newKeyHash Key hash after the update
      */
-    event KeyHashUpdated(bytes32 previousKeyHash, bytes32 newKeyHash);
+    event KeyHashUpdated(bytes32 indexed previousKeyHash, bytes32 indexed newKeyHash);
 
     /**
      * @notice Emitted when the VRF callback gas limit changes

@@ -32,7 +32,7 @@ contract GoldTokenTest is Test {
 
     bytes32 public constant OWNER_ROLE = keccak256("OWNER_ROLE");
 
-    event GoldTokenInitialized(address indexed owner, address dataFeedGold, address dataFeedEth);
+    event GoldTokenInitialized(address indexed owner, address indexed dataFeedGold, address indexed dataFeedEth);
     event FeesAddressUpdated(address indexed previousFeesAddress, address indexed newFeesAddress);
     event LotterieAddressUpdated(address indexed previousLotterieAddress, address indexed newLotterieAddress);
     event UserAdded(address indexed user, uint256 timestamp);

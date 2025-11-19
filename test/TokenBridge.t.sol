@@ -40,7 +40,7 @@ contract TokenBridgeTest is Test {
     event TokenBridgeInitialized(
         address indexed owner, address indexed link, address indexed goldToken, uint64 destinationChainSelector
     );
-    event MessageProcessedWithoutToken(bytes32 indexed messageId, uint64 sourceChainSelector);
+    event MessageProcessedWithoutToken(bytes32 indexed messageId, uint64 indexed sourceChainSelector);
     event TokensBridged(
         bytes32 indexed messageId,
         address indexed sender,
@@ -51,12 +51,12 @@ contract TokenBridgeTest is Test {
         uint256 fees
     );
     event TokensReceived(
-        bytes32 indexed messageId, address indexed receiver, uint256 amount, uint64 sourceChainSelector
+        bytes32 indexed messageId, address indexed receiver, uint256 amount, uint64 indexed sourceChainSelector
     );
-    event ChainWhitelisted(uint64 chainSelector);
-    event ChainRemoved(uint64 chainSelector);
-    event SenderWhitelisted(address sender);
-    event SenderRemoved(address sender);
+    event ChainWhitelisted(uint64 indexed chainSelector);
+    event ChainRemoved(uint64 indexed chainSelector);
+    event SenderWhitelisted(address indexed sender);
+    event SenderRemoved(address indexed sender);
 
     function setUp() public {
         // Setup accounts
@@ -451,7 +451,7 @@ contract TokenBridgeTest is Test {
             destTokenAmounts: destTokenAmounts
         });
 
-        vm.expectEmit(true, false, false, true, address(tokenBridge));
+        vm.expectEmit(true, true, false, false, address(tokenBridge));
         emit MessageProcessedWithoutToken(message.messageId, BSC_CHAIN_SELECTOR);
         vm.prank(address(router));
         tokenBridge.ccipReceive(message);
@@ -797,9 +797,9 @@ contract TokenBridgeTest is Test {
         assertEq(log.topics[1], expectedMessageId, "messageId mismatch");
         assertEq(_topicToAddress(log.topics[2]), expectedReceiver, "receiver mismatch");
 
-        (uint256 amount, uint64 sourceSelector) = abi.decode(log.data, (uint256, uint64));
+        uint256 amount = abi.decode(log.data, (uint256));
         assertEq(amount, expectedAmount, "amount mismatch");
-        assertEq(sourceSelector, expectedSourceSelector, "source mismatch");
+        assertEq(uint64(uint256(log.topics[3])), expectedSourceSelector, "source mismatch");
     }
 
     receive() external payable {}

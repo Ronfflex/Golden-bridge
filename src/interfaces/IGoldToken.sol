@@ -16,7 +16,7 @@ interface IGoldToken {
      * @param dataFeedGold Chainlink feed used for gold pricing
      * @param dataFeedEth Chainlink feed used for ETH/USD pricing
      */
-    event GoldTokenInitialized(address indexed owner, address dataFeedGold, address dataFeedEth);
+    event GoldTokenInitialized(address indexed owner, address indexed dataFeedGold, address indexed dataFeedEth);
 
     /**
      * @notice Emitted whenever protocol fees are minted from an ETH deposit

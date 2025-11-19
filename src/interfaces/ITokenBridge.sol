@@ -60,7 +60,7 @@ interface ITokenBridge {
      * @param sourceChainSelector Chain selector of the origin network
      */
     event TokensReceived(
-        bytes32 indexed messageId, address indexed receiver, uint256 amount, uint64 sourceChainSelector
+        bytes32 indexed messageId, address indexed receiver, uint256 amount, uint64 indexed sourceChainSelector
     );
 
     /**
@@ -68,28 +68,28 @@ interface ITokenBridge {
      * @param messageId CCIP message identifier
      * @param sourceChainSelector Chain selector of the origin network
      */
-    event MessageProcessedWithoutToken(bytes32 indexed messageId, uint64 sourceChainSelector);
+    event MessageProcessedWithoutToken(bytes32 indexed messageId, uint64 indexed sourceChainSelector);
 
     /**
      * @notice Emitted when a chain selector is whitelisted for bridging
      * @param chainSelector Chain selector that became whitelisted
      */
-    event ChainWhitelisted(uint64 chainSelector);
+    event ChainWhitelisted(uint64 indexed chainSelector);
     /**
      * @notice Emitted when a chain selector is removed from the whitelist
      * @param chainSelector Chain selector that was removed
      */
-    event ChainRemoved(uint64 chainSelector);
+    event ChainRemoved(uint64 indexed chainSelector);
     /**
      * @notice Emitted when an address is authorized to initiate bridge transfers
      * @param sender Address added to the sender whitelist
      */
-    event SenderWhitelisted(address sender);
+    event SenderWhitelisted(address indexed sender);
     /**
      * @notice Emitted when an address is removed from the sender whitelist
      * @param sender Address removed from the sender whitelist
      */
-    event SenderRemoved(address sender);
+    event SenderRemoved(address indexed sender);
 
     /*//////////////////////////////////////////////////////////////
                                  ERRORS

@@ -30,9 +30,9 @@ contract LotterieTest is Test {
         uint16 requestConfirmations,
         uint32 numWords
     );
-    event VrfSubscriptionUpdated(uint256 previousSubscriptionId, uint256 newSubscriptionId);
+    event VrfSubscriptionUpdated(uint256 indexed previousSubscriptionId, uint256 indexed newSubscriptionId);
     event VrfCoordinatorUpdated(address indexed previousCoordinator, address indexed newCoordinator);
-    event KeyHashUpdated(bytes32 previousKeyHash, bytes32 newKeyHash);
+    event KeyHashUpdated(bytes32 indexed previousKeyHash, bytes32 indexed newKeyHash);
     event CallbackGasLimitUpdated(uint32 previousGasLimit, uint32 newGasLimit);
     event RequestConfirmationsUpdated(uint16 previousConfirmations, uint16 newConfirmations);
     event NumWordsUpdated(uint32 previousNumWords, uint32 newNumWords);
@@ -114,7 +114,7 @@ contract LotterieTest is Test {
         (Vm.Log memory randomDrawLog, bool found) = _findLog(logs, keccak256("RandomDrawed(uint256)"));
         assertTrue(found, "RandomDrawed event missing");
 
-        uint256 emittedRequestId = abi.decode(randomDrawLog.data, (uint256));
+        uint256 emittedRequestId = uint256(randomDrawLog.topics[1]);
         assertEq(emittedRequestId, requestId, "requestId should match event payload");
     }
 
