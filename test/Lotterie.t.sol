@@ -33,9 +33,9 @@ contract LotterieTest is Test {
     event VrfSubscriptionUpdated(uint256 indexed previousSubscriptionId, uint256 indexed newSubscriptionId);
     event VrfCoordinatorUpdated(address indexed previousCoordinator, address indexed newCoordinator);
     event KeyHashUpdated(bytes32 indexed previousKeyHash, bytes32 indexed newKeyHash);
-    event CallbackGasLimitUpdated(uint32 previousGasLimit, uint32 newGasLimit);
-    event RequestConfirmationsUpdated(uint16 previousConfirmations, uint16 newConfirmations);
-    event NumWordsUpdated(uint32 previousNumWords, uint32 newNumWords);
+    event CallbackGasLimitUpdated(uint32 indexed previousGasLimit, uint32 indexed newGasLimit);
+    event RequestConfirmationsUpdated(uint16 indexed previousConfirmations, uint16 indexed newConfirmations);
+    event NumWordsUpdated(uint32 indexed previousNumWords, uint32 indexed newNumWords);
     event GoldTokenUpdated(address indexed previousGoldToken, address indexed newGoldToken);
     event GainClaimed(address indexed account, uint256 amount);
 
@@ -183,7 +183,7 @@ contract LotterieTest is Test {
 
     function test_setVrfSubscriptionId() public {
         uint256 previous = lotterie.getVrfSubscriptionId();
-        vm.expectEmit(false, false, false, true, address(lotterie));
+        vm.expectEmit(true, true, false, false, address(lotterie));
         emit VrfSubscriptionUpdated(previous, 10);
         lotterie.setVrfSubscriptionId(10);
         uint256 vrfSubscriptionId = lotterie.getVrfSubscriptionId();
@@ -201,7 +201,7 @@ contract LotterieTest is Test {
 
     function test_setKeyHash() public {
         bytes32 expectedKeyHash = keccak256(abi.encodePacked("test-key-hash"));
-        vm.expectEmit(false, false, false, true, address(lotterie));
+        vm.expectEmit(true, true, false, false, address(lotterie));
         emit KeyHashUpdated(lotterie.getKeyHash(), expectedKeyHash);
         lotterie.setKeyHash(expectedKeyHash);
         bytes32 keyHash = lotterie.getKeyHash();
@@ -209,7 +209,7 @@ contract LotterieTest is Test {
     }
 
     function test_setCallbackGasLimit() public {
-        vm.expectEmit(false, false, false, true, address(lotterie));
+        vm.expectEmit(true, true, false, false, address(lotterie));
         emit CallbackGasLimitUpdated(lotterie.getCallbackGasLimit(), 10);
         lotterie.setCallbackGasLimit(10);
         uint32 gasLimit = lotterie.getCallbackGasLimit();
@@ -217,7 +217,7 @@ contract LotterieTest is Test {
     }
 
     function test_setRequestConfirmations() public {
-        vm.expectEmit(false, false, false, true, address(lotterie));
+        vm.expectEmit(true, true, false, false, address(lotterie));
         emit RequestConfirmationsUpdated(lotterie.getRequestConfirmations(), 10);
         lotterie.setRequestConfirmations(10);
         uint16 confirmations = lotterie.getRequestConfirmations();
@@ -225,7 +225,7 @@ contract LotterieTest is Test {
     }
 
     function test_setNumWords() public {
-        vm.expectEmit(false, false, false, true, address(lotterie));
+        vm.expectEmit(true, true, false, false, address(lotterie));
         emit NumWordsUpdated(lotterie.getNumWords(), 10);
         lotterie.setNumWords(10);
         uint32 numWords = lotterie.getNumWords();

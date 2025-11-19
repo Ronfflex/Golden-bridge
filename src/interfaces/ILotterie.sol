@@ -69,21 +69,21 @@ interface ILotterie {
      * @param previousGasLimit Gas limit before the update
      * @param newGasLimit Gas limit after the update
      */
-    event CallbackGasLimitUpdated(uint32 previousGasLimit, uint32 newGasLimit);
+    event CallbackGasLimitUpdated(uint32 indexed previousGasLimit, uint32 indexed newGasLimit);
 
     /**
      * @notice Emitted when the VRF confirmation requirement changes
      * @param previousConfirmations Confirmation count before the update
      * @param newConfirmations Confirmation count after the update
      */
-    event RequestConfirmationsUpdated(uint16 previousConfirmations, uint16 newConfirmations);
+    event RequestConfirmationsUpdated(uint16 indexed previousConfirmations, uint16 indexed newConfirmations);
 
     /**
      * @notice Emitted when the number of random words per draw changes
      * @param previousNumWords Word count before the update
      * @param newNumWords Word count after the update
      */
-    event NumWordsUpdated(uint32 previousNumWords, uint32 newNumWords);
+    event NumWordsUpdated(uint32 indexed previousNumWords, uint32 indexed newNumWords);
 
     /**
      * @notice Emitted when the GoldToken proxy linked to the lottery changes
