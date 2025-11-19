@@ -128,6 +128,7 @@ contract TokenBridge is
         });
 
         emit ChainWhitelisted(_destinationChainSelector);
+        emit TokenBridgeInitialized(owner, _link, _goldToken, _destinationChainSelector);
     }
 
     /**
@@ -280,6 +281,7 @@ contract TokenBridge is
 
         if (!foundGoldToken) {
             processedMessages[message.messageId] = true;
+            emit MessageProcessedWithoutToken(message.messageId, message.sourceChainSelector);
         }
     }
 

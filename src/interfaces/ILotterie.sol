@@ -21,6 +21,84 @@ interface ILotterie {
      */
     event Winner(address indexed winner);
 
+    /**
+     * @notice Emitted once when the Lotterie proxy is initialized
+     * @param owner Address granted OWNER_ROLE
+     * @param vrfCoordinator Chainlink VRF coordinator contract address
+     * @param goldToken GoldToken proxy associated with the lottery
+     * @param vrfSubscriptionId VRF subscription identifier configured for draws
+     * @param keyHash Chainlink VRF key hash used to request randomness
+     * @param callbackGasLimit Gas limit allocated to fulfillRandomWords
+     * @param requestConfirmations Number of confirmations required per VRF request
+     * @param numWords Number of random words requested per draw
+     */
+    event LotterieInitialized(
+        address indexed owner,
+        address indexed vrfCoordinator,
+        address indexed goldToken,
+        uint256 vrfSubscriptionId,
+        bytes32 keyHash,
+        uint32 callbackGasLimit,
+        uint16 requestConfirmations,
+        uint32 numWords
+    );
+
+    /**
+     * @notice Emitted when the VRF subscription id changes
+     * @param previousSubscriptionId Subscription id before the update
+     * @param newSubscriptionId Subscription id after the update
+     */
+    event VrfSubscriptionUpdated(uint256 previousSubscriptionId, uint256 newSubscriptionId);
+
+    /**
+     * @notice Emitted when the VRF coordinator reference changes
+     * @param previousCoordinator Coordinator address before the update
+     * @param newCoordinator Coordinator address after the update
+     */
+    event VrfCoordinatorUpdated(address indexed previousCoordinator, address indexed newCoordinator);
+
+    /**
+     * @notice Emitted when the VRF key hash changes
+     * @param previousKeyHash Key hash before the update
+     * @param newKeyHash Key hash after the update
+     */
+    event KeyHashUpdated(bytes32 previousKeyHash, bytes32 newKeyHash);
+
+    /**
+     * @notice Emitted when the VRF callback gas limit changes
+     * @param previousGasLimit Gas limit before the update
+     * @param newGasLimit Gas limit after the update
+     */
+    event CallbackGasLimitUpdated(uint32 previousGasLimit, uint32 newGasLimit);
+
+    /**
+     * @notice Emitted when the VRF confirmation requirement changes
+     * @param previousConfirmations Confirmation count before the update
+     * @param newConfirmations Confirmation count after the update
+     */
+    event RequestConfirmationsUpdated(uint16 previousConfirmations, uint16 newConfirmations);
+
+    /**
+     * @notice Emitted when the number of random words per draw changes
+     * @param previousNumWords Word count before the update
+     * @param newNumWords Word count after the update
+     */
+    event NumWordsUpdated(uint32 previousNumWords, uint32 newNumWords);
+
+    /**
+     * @notice Emitted when the GoldToken proxy linked to the lottery changes
+     * @param previousGoldToken GoldToken address before the update
+     * @param newGoldToken GoldToken address after the update
+     */
+    event GoldTokenUpdated(address indexed previousGoldToken, address indexed newGoldToken);
+
+    /**
+     * @notice Emitted when a participant successfully claims lottery gains
+     * @param account Winner address claiming their gains
+     * @param amount Amount of GLD transferred to the winner
+     */
+    event GainClaimed(address indexed account, uint256 amount);
+
     /*//////////////////////////////////////////////////////////////
                                  ERRORS
     //////////////////////////////////////////////////////////////*/

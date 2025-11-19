@@ -76,6 +76,8 @@ contract GoldToken is
         _fees = 5; // 5%
         _feesAddress = owner;
         _minimumGoldToBlock = 1 ether; // 1 GLD
+
+        emit GoldTokenInitialized(owner, dataFeedGoldAddress, dataFeedEthAddress);
     }
 
     /// @dev Restricts upgrades to addresses holding OWNER_ROLE
@@ -110,12 +112,16 @@ contract GoldToken is
 
     /// @inheritdoc IGoldToken
     function setFeesAddress(address feesAddress) external override onlyRole(OWNER_ROLE) {
+        address previous = _feesAddress;
         _feesAddress = feesAddress;
+        emit FeesAddressUpdated(previous, feesAddress);
     }
 
     /// @inheritdoc IGoldToken
     function setLotterieAddress(address lotterieAddress) external override onlyRole(OWNER_ROLE) {
+        address previous = _lotterieAddress;
         _lotterieAddress = lotterieAddress;
+        emit LotterieAddressUpdated(previous, lotterieAddress);
     }
 
     /// @inheritdoc IGoldToken
@@ -193,10 +199,11 @@ contract GoldToken is
     function _removeUser(address user) private {
         _timestamps[user] = 0;
         uint256 length = _users.length;
-        for (uint256 i; i < length; ++i) {
+        for (uint256 i; i < length; i++) {
             if (_users[i] == user) {
                 _users[i] = _users[_users.length - 1];
                 _users.pop();
+                emit UserRemoved(user);
                 break;
             }
         }
@@ -207,6 +214,7 @@ contract GoldToken is
         if (_timestamps[user] == 0) {
             _users.push(user);
             _timestamps[user] = block.timestamp;
+            emit UserAdded(user, block.timestamp);
         }
     }
 
@@ -217,10 +225,10 @@ contract GoldToken is
     /// @inheritdoc IGoldToken
     function getGoldPriceInEth() public view override returns (int256) {
         (, int256 goldUsdPerTroyOunce,,,) = _dataFeedGold.latestRoundData(); // Price per troy ounce (31.1034768 g) = x USD (8 decimals)
-        int256 goldUsdPerGram = (goldUsdPerTroyOunce * 10_000_000) / 311_034_768; // Multiply first to preserve precision
+        int256 goldUsdPerGram = (goldUsdPerTroyOunce * 10_000_000) / 311_034_768;
 
         (, int256 ethUsd,,,) = _dataFeedEth.latestRoundData(); // 1 ETH = y USD (8 decimals)
-        return goldUsdPerGram * 10 ** 8 / ethUsd; // Multiply first to preserve precision
+        return goldUsdPerGram * 10 ** 8 / ethUsd;
     }
 
     /// @inheritdoc IGoldToken

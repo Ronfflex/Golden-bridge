@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {Test, console2} from "forge-std/Test.sol";
+import {Test, Vm} from "forge-std/Test.sol";
 import {Lotterie} from "../src/Lotterie.sol";
 import {ILotterie} from "../src/interfaces/ILotterie.sol";
 import {GoldToken} from "../src/GoldToken.sol";
@@ -19,6 +19,25 @@ contract LotterieTest is Test {
 
     Lotterie public lotterie;
     VRFCoordinatorV2_5Mock public vrfCoordinator;
+
+    event LotterieInitialized(
+        address indexed owner,
+        address indexed vrfCoordinator,
+        address indexed goldToken,
+        uint256 vrfSubscriptionId,
+        bytes32 keyHash,
+        uint32 callbackGasLimit,
+        uint16 requestConfirmations,
+        uint32 numWords
+    );
+    event VrfSubscriptionUpdated(uint256 previousSubscriptionId, uint256 newSubscriptionId);
+    event VrfCoordinatorUpdated(address indexed previousCoordinator, address indexed newCoordinator);
+    event KeyHashUpdated(bytes32 previousKeyHash, bytes32 newKeyHash);
+    event CallbackGasLimitUpdated(uint32 previousGasLimit, uint32 newGasLimit);
+    event RequestConfirmationsUpdated(uint16 previousConfirmations, uint16 newConfirmations);
+    event NumWordsUpdated(uint32 previousNumWords, uint32 newNumWords);
+    event GoldTokenUpdated(address indexed previousGoldToken, address indexed newGoldToken);
+    event GainClaimed(address indexed account, uint256 amount);
 
     function setUp() public {
         vm.deal(address(this), 100 ether);
@@ -88,8 +107,15 @@ contract LotterieTest is Test {
 
     function test_randomDraw() public {
         vm.warp(block.timestamp + 1 days);
-        console2.log("Current time:", block.timestamp + 1 days);
-        lotterie.randomDraw();
+        vm.recordLogs();
+        uint256 requestId = lotterie.randomDraw();
+
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        (Vm.Log memory randomDrawLog, bool found) = _findLog(logs, keccak256("RandomDrawed(uint256)"));
+        assertTrue(found, "RandomDrawed event missing");
+
+        uint256 emittedRequestId = abi.decode(randomDrawLog.data, (uint256));
+        assertEq(emittedRequestId, requestId, "requestId should match event payload");
     }
 
     function test_randomDrawFulfillmentAndClaimFlow() public {
@@ -102,9 +128,15 @@ contract LotterieTest is Test {
         uint256 lotterieBalanceBefore = goldToken.balanceOf(address(lotterie));
         assertTrue(lotterieBalanceBefore > 0, "lottery should hold rewards before fulfillment");
 
+        vm.recordLogs();
         vrfCoordinator.fulfillRandomWords(requestId, address(lotterie));
 
         address winner = lotterie.getResults(requestId);
+        Vm.Log[] memory fulfillmentLogs = vm.getRecordedLogs();
+        (Vm.Log memory winnerLog, bool winnerFound) = _findLog(fulfillmentLogs, keccak256("Winner(address)"));
+        assertTrue(winnerFound, "Winner event missing");
+        address emittedWinner = _topicToAddress(winnerLog.topics[1]);
+        assertEq(emittedWinner, winner, "winner event payload mismatch");
         assertTrue(winner != address(0), "winner should not be the zero address");
 
         uint256 gains = lotterie.getGains(winner);
@@ -112,6 +144,8 @@ contract LotterieTest is Test {
 
         uint256 winnerBalanceBefore = goldToken.balanceOf(winner);
 
+        vm.expectEmit(true, false, false, true, address(lotterie));
+        emit GainClaimed(winner, gains);
         vm.prank(winner);
         lotterie.claim();
 
@@ -148,12 +182,18 @@ contract LotterieTest is Test {
     }
 
     function test_setVrfSubscriptionId() public {
+        uint256 previous = lotterie.getVrfSubscriptionId();
+        vm.expectEmit(false, false, false, true, address(lotterie));
+        emit VrfSubscriptionUpdated(previous, 10);
         lotterie.setVrfSubscriptionId(10);
         uint256 vrfSubscriptionId = lotterie.getVrfSubscriptionId();
         assertEq(vrfSubscriptionId, 10, "vrfSubscriptionId should be 10");
     }
 
     function test_setVrfCoordinator() public {
+        address previous = lotterie.getVrfCoordinator();
+        vm.expectEmit(true, true, false, false, address(lotterie));
+        emit VrfCoordinatorUpdated(previous, address(0x1));
         lotterie.setVrfCoordinator(address(0x1));
         address vrf = lotterie.getVrfCoordinator();
         assertEq(vrf, address(0x1), "vrfCoordinator should be 0x1");
@@ -161,33 +201,73 @@ contract LotterieTest is Test {
 
     function test_setKeyHash() public {
         bytes32 expectedKeyHash = keccak256(abi.encodePacked("test-key-hash"));
+        vm.expectEmit(false, false, false, true, address(lotterie));
+        emit KeyHashUpdated(lotterie.getKeyHash(), expectedKeyHash);
         lotterie.setKeyHash(expectedKeyHash);
         bytes32 keyHash = lotterie.getKeyHash();
         assertEq(keyHash, expectedKeyHash, "keyHash should match expected value");
     }
 
     function test_setCallbackGasLimit() public {
+        vm.expectEmit(false, false, false, true, address(lotterie));
+        emit CallbackGasLimitUpdated(lotterie.getCallbackGasLimit(), 10);
         lotterie.setCallbackGasLimit(10);
         uint32 gasLimit = lotterie.getCallbackGasLimit();
         assertEq(gasLimit, 10, "gasLimit should be 10");
     }
 
     function test_setRequestConfirmations() public {
+        vm.expectEmit(false, false, false, true, address(lotterie));
+        emit RequestConfirmationsUpdated(lotterie.getRequestConfirmations(), 10);
         lotterie.setRequestConfirmations(10);
         uint16 confirmations = lotterie.getRequestConfirmations();
         assertEq(confirmations, 10, "confirmations should be 10");
     }
 
     function test_setNumWords() public {
+        vm.expectEmit(false, false, false, true, address(lotterie));
+        emit NumWordsUpdated(lotterie.getNumWords(), 10);
         lotterie.setNumWords(10);
         uint32 numWords = lotterie.getNumWords();
         assertEq(numWords, 10, "numWords should be 10");
     }
 
     function test_setGoldToken() public {
+        vm.expectEmit(true, true, false, false, address(lotterie));
+        emit GoldTokenUpdated(address(goldToken), address(0x1));
         lotterie.setGoldToken(address(0x1));
         address goldTokenAddress = lotterie.getGoldToken();
         assertEq(goldTokenAddress, address(0x1), "goldToken should be 0x1");
+    }
+
+    function test_initialize_emits_event() public {
+        Lotterie implementation = new Lotterie(address(vrfCoordinator));
+        uint256 subscription = vrfCoordinator.createSubscription();
+        vm.expectEmit(true, true, true, true);
+        emit LotterieInitialized(
+            address(this),
+            address(vrfCoordinator),
+            address(goldToken),
+            subscription,
+            bytes32(uint256(0x1111)),
+            50_000,
+            2,
+            1
+        );
+        new ERC1967Proxy(
+            address(implementation),
+            abi.encodeWithSelector(
+                Lotterie.initialize.selector,
+                address(this),
+                subscription,
+                address(vrfCoordinator),
+                bytes32(uint256(0x1111)),
+                50_000,
+                2,
+                1,
+                address(goldToken)
+            )
+        );
     }
 
     function test_getLastRequestId() public view {
@@ -222,5 +302,20 @@ contract LotterieTest is Test {
         );
         vm.prank(nonOwner);
         UUPSUpgradeable(address(lotterie)).upgradeToAndCall(address(newImplementation), "");
+    }
+
+    function _findLog(Vm.Log[] memory logs, bytes32 topic) private pure returns (Vm.Log memory, bool) {
+        for (uint256 i; i < logs.length; ++i) {
+            if (logs[i].topics.length > 0 && logs[i].topics[0] == topic) {
+                return (logs[i], true);
+            }
+        }
+
+        Vm.Log memory empty;
+        return (empty, false);
+    }
+
+    function _topicToAddress(bytes32 topic) private pure returns (address) {
+        return address(uint160(uint256(topic)));
     }
 }

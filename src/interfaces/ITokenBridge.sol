@@ -22,6 +22,17 @@ interface ITokenBridge {
                                  EVENTS
     //////////////////////////////////////////////////////////////*/
     /**
+     * @notice Emitted once the TokenBridge proxy completes initialization
+     * @param owner Address granted OWNER_ROLE
+     * @param link LINK token used to pay CCIP fees
+     * @param goldToken GoldToken proxy managed by the bridge
+     * @param destinationChainSelector Default destination selector configured for outbound messages
+     */
+    event TokenBridgeInitialized(
+        address indexed owner, address indexed link, address indexed goldToken, uint64 destinationChainSelector
+    );
+
+    /**
      * @notice Emitted when GLD is bridged out to a destination chain
      * @param messageId CCIP message identifier
      * @param sender Address initiating the bridge transfer
@@ -51,6 +62,13 @@ interface ITokenBridge {
     event TokensReceived(
         bytes32 indexed messageId, address indexed receiver, uint256 amount, uint64 sourceChainSelector
     );
+
+    /**
+     * @notice Emitted when a CCIP message is processed without transferring GLD
+     * @param messageId CCIP message identifier
+     * @param sourceChainSelector Chain selector of the origin network
+     */
+    event MessageProcessedWithoutToken(bytes32 indexed messageId, uint64 sourceChainSelector);
 
     /**
      * @notice Emitted when a chain selector is whitelisted for bridging

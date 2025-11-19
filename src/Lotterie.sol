@@ -31,7 +31,6 @@ contract Lotterie is
 
     /// @notice Role identifier for operators allowed to manage draws and upgrades
     bytes32 public constant OWNER_ROLE = keccak256("OWNER_ROLE");
-    uint256 private constant ROLL_IN_PROGRESS = 42;
 
     uint256 internal _vrfSubscriptionId;
     bytes32 internal _vrfKeyHash;
@@ -81,6 +80,17 @@ contract Lotterie is
 
         _lastRandomDraw = block.timestamp - 1 days;
         _goldToken = IGoldToken(goldToken);
+
+        emit LotterieInitialized(
+            owner,
+            vrfCoordinator,
+            goldToken,
+            vrfSubscriptionId,
+            keyHash,
+            callbackGasLimit,
+            requestConfirmations,
+            numWords
+        );
     }
 
     function _authorizeUpgrade(address newImplementation) internal override onlyRole(OWNER_ROLE) {}
@@ -105,37 +115,51 @@ contract Lotterie is
 
     /// @inheritdoc ILotterie
     function setVrfSubscriptionId(uint256 vrfSubscriptionId) external override onlyRole(OWNER_ROLE) {
+        uint256 previous = _vrfSubscriptionId;
         _vrfSubscriptionId = vrfSubscriptionId;
+        emit VrfSubscriptionUpdated(previous, vrfSubscriptionId);
     }
 
     /// @inheritdoc ILotterie
     function setVrfCoordinator(address vrfCoordinator) external override onlyRole(OWNER_ROLE) {
+        address previous = address(s_vrfCoordinator);
         s_vrfCoordinator = IVRFCoordinatorV2Plus(vrfCoordinator);
+        emit VrfCoordinatorUpdated(previous, vrfCoordinator);
     }
 
     /// @inheritdoc ILotterie
     function setKeyHash(bytes32 keyHash) external override onlyRole(OWNER_ROLE) {
+        bytes32 previous = _vrfKeyHash;
         _vrfKeyHash = keyHash;
+        emit KeyHashUpdated(previous, keyHash);
     }
 
     /// @inheritdoc ILotterie
     function setCallbackGasLimit(uint32 callbackGasLimit) external override onlyRole(OWNER_ROLE) {
+        uint32 previous = _callbackGasLimit;
         _callbackGasLimit = callbackGasLimit;
+        emit CallbackGasLimitUpdated(previous, callbackGasLimit);
     }
 
     /// @inheritdoc ILotterie
     function setRequestConfirmations(uint16 requestConfirmations) external override onlyRole(OWNER_ROLE) {
+        uint16 previous = _requestConfirmations;
         _requestConfirmations = requestConfirmations;
+        emit RequestConfirmationsUpdated(previous, requestConfirmations);
     }
 
     /// @inheritdoc ILotterie
     function setNumWords(uint32 numWords) external override onlyRole(OWNER_ROLE) {
+        uint32 previous = _numWords;
         _numWords = numWords;
+        emit NumWordsUpdated(previous, numWords);
     }
 
     /// @inheritdoc ILotterie
     function setGoldToken(address goldToken) external override onlyRole(OWNER_ROLE) {
+        address previous = address(_goldToken);
         _goldToken = IGoldToken(goldToken);
+        emit GoldTokenUpdated(previous, goldToken);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -188,6 +212,7 @@ contract Lotterie is
         if (!success) {
             revert TransferFailed();
         }
+        emit GainClaimed(msg.sender, amount);
     }
 
     /// @inheritdoc ILotterie
