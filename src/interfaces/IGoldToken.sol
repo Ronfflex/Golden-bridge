@@ -11,11 +11,46 @@ interface IGoldToken {
                                  EVENTS
     //////////////////////////////////////////////////////////////*/
     /**
-     * @notice Emitted when GLD is minted after an ETH deposit
+     * @notice Emitted once during proxy initialization to capture deployment context
+     * @param owner Address granted OWNER_ROLE and set as initial fee recipient
+     * @param dataFeedGold Chainlink feed used for gold pricing
+     * @param dataFeedEth Chainlink feed used for ETH/USD pricing
+     */
+    event GoldTokenInitialized(address indexed owner, address indexed dataFeedGold, address indexed dataFeedEth);
+
+    /**
+     * @notice Emitted whenever protocol fees are minted from an ETH deposit
      * @param to Recipient receiving the freshly minted GLD
      * @param amount Amount of GLD minted (net of protocol fees)
      */
     event Mint(address indexed to, uint256 amount);
+
+    /**
+     * @notice Emitted when the fee recipient address changes
+     * @param previousFeesAddress Fee recipient before the update
+     * @param newFeesAddress Fee recipient after the update
+     */
+    event FeesAddressUpdated(address indexed previousFeesAddress, address indexed newFeesAddress);
+
+    /**
+     * @notice Emitted when the linked Lotterie contract is updated
+     * @param previousLotterieAddress Lotterie address before the change
+     * @param newLotterieAddress Lotterie address after the change
+     */
+    event LotterieAddressUpdated(address indexed previousLotterieAddress, address indexed newLotterieAddress);
+
+    /**
+     * @notice Emitted when an address becomes lottery-eligible for the first time
+     * @param user Account added to the eligibility list
+     * @param timestamp Block timestamp recorded for the user
+     */
+    event UserAdded(address indexed user, uint256 timestamp);
+
+    /**
+     * @notice Emitted when an address is removed from the lottery-eligible set
+     * @param user Account removed from tracking
+     */
+    event UserRemoved(address indexed user);
 
     /*//////////////////////////////////////////////////////////////
                                  ERRORS
@@ -26,6 +61,8 @@ interface IGoldToken {
     error AmountMustBeGreaterThanZero();
     /// @notice Thrown when Chainlink feeds yield a non-positive gold price in ETH
     error InvalidGoldPrice();
+    /// @notice Thrown when withdrawing ETH to an owner fails
+    error EthTransferFailed();
 
     /*//////////////////////////////////////////////////////////////
                              ADMIN FUNCTIONS

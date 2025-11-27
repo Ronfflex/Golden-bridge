@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {Test} from "forge-std/Test.sol";
+import {Test, Vm} from "forge-std/Test.sol";
 import {ITokenBridge} from "../src/interfaces/ITokenBridge.sol";
 import {TokenBridge} from "../src/TokenBridge.sol";
 import {GoldToken} from "../src/GoldToken.sol";
@@ -36,6 +36,27 @@ contract TokenBridgeTest is Test {
     // Price feeds for GoldToken
     MockV3Aggregator public goldAggregator;
     MockV3Aggregator public ethAggregator;
+
+    event TokenBridgeInitialized(
+        address indexed owner, address indexed link, address indexed goldToken, uint64 destinationChainSelector
+    );
+    event MessageProcessedWithoutToken(bytes32 indexed messageId, uint64 indexed sourceChainSelector);
+    event TokensBridged(
+        bytes32 indexed messageId,
+        address indexed sender,
+        address indexed receiver,
+        uint256 amount,
+        uint64 destinationChainSelector,
+        address feeToken,
+        uint256 fees
+    );
+    event TokensReceived(
+        bytes32 indexed messageId, address indexed receiver, uint256 amount, uint64 indexed sourceChainSelector
+    );
+    event ChainWhitelisted(uint64 indexed chainSelector);
+    event ChainRemoved(uint64 indexed chainSelector);
+    event SenderWhitelisted(address indexed sender);
+    event SenderRemoved(address indexed sender);
 
     function setUp() public {
         // Setup accounts
@@ -128,6 +149,18 @@ contract TokenBridgeTest is Test {
         assertTrue(tokenBridge.whitelistedChains(BSC_CHAIN_SELECTOR));
     }
 
+    function test_initialize_emits_event() public {
+        TokenBridge implementation = new TokenBridge(address(router));
+        vm.expectEmit(true, true, true, true);
+        emit TokenBridgeInitialized(owner, address(linkToken), address(goldToken), BSC_CHAIN_SELECTOR);
+        new ERC1967Proxy(
+            address(implementation),
+            abi.encodeWithSelector(
+                TokenBridge.initialize.selector, owner, address(linkToken), address(goldToken), BSC_CHAIN_SELECTOR
+            )
+        );
+    }
+
     function test_cannotReinitialize() public {
         vm.expectRevert(Initializable.InvalidInitialization.selector);
         tokenBridge.initialize(owner, address(linkToken), address(goldToken), BSC_CHAIN_SELECTOR);
@@ -193,6 +226,7 @@ contract TokenBridgeTest is Test {
         _setupLinkBalances();
         uint256 amount = 1 ether;
         address receiver = address(0x9999); // Use a normal address instead of precompile
+        uint256 feeAmount = 0;
 
         // Record initial balance
         uint256 initialBridgeBalance = goldToken.balanceOf(address(tokenBridge));
@@ -207,6 +241,7 @@ contract TokenBridgeTest is Test {
         vm.mockCall(address(router), abi.encodeWithSelector(router.ccipSend.selector), abi.encode(expectedMsgId));
 
         // Bridge tokens
+        vm.recordLogs();
         bytes32 returnedId = tokenBridge.bridgeTokens(receiver, amount, ITokenBridge.PayFeesIn.LINK);
 
         // Verify messageId
@@ -222,11 +257,16 @@ contract TokenBridgeTest is Test {
         assertEq(
             goldToken.allowance(address(tokenBridge), address(router)), amount, "Token should be approved to router"
         );
+
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        _assertTokensBridgedLog(logs, expectedMsgId, address(this), receiver, amount, address(linkToken), feeAmount);
     }
 
     function test_bridgeTokensWithNative() public {
         uint256 amount = 1 ether;
         address receiver = address(0x9999);
+        uint256 nativeFee = 0.1 ether;
+        router.setFee(nativeFee);
 
         // Record initial balance
         uint256 initialBridgeBalance = goldToken.balanceOf(address(tokenBridge));
@@ -240,7 +280,8 @@ contract TokenBridgeTest is Test {
         vm.mockCall(address(router), abi.encodeWithSelector(router.ccipSend.selector), abi.encode(messageId));
 
         // Bridge tokens with native token fees
-        bytes32 returnedId = tokenBridge.bridgeTokens{value: 1 ether}(receiver, amount, ITokenBridge.PayFeesIn.Native);
+        vm.recordLogs();
+        bytes32 returnedId = tokenBridge.bridgeTokens{value: nativeFee}(receiver, amount, ITokenBridge.PayFeesIn.Native);
 
         // Verify messageId
         assertEq(returnedId, messageId);
@@ -250,6 +291,9 @@ contract TokenBridgeTest is Test {
             goldToken.balanceOf(address(tokenBridge)), initialBridgeBalance + amount, "Bridge balance should increase"
         );
         assertEq(goldToken.balanceOf(address(this)), initialSenderBalance - amount, "Sender balance should decrease");
+
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        _assertTokensBridgedLog(logs, messageId, address(this), receiver, amount, address(0), nativeFee);
     }
 
     function test_bridgeTokensWithNativeFailsWithoutFeeBalance() public {
@@ -354,6 +398,7 @@ contract TokenBridgeTest is Test {
         });
 
         // Simulate router calling ccipReceive
+        vm.recordLogs();
         vm.prank(address(router));
         tokenBridge.ccipReceive(message);
 
@@ -365,6 +410,9 @@ contract TokenBridgeTest is Test {
         assertEq(
             goldToken.balanceOf(address(tokenBridge)), initialBridgeBalance - amount, "Bridge balance should decrease"
         );
+
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        _assertTokensReceivedLog(logs, message.messageId, recipient, amount, BSC_CHAIN_SELECTOR);
     }
 
     function test_cannotReceiveSameMessageTwice() public {
@@ -403,6 +451,8 @@ contract TokenBridgeTest is Test {
             destTokenAmounts: destTokenAmounts
         });
 
+        vm.expectEmit(true, true, false, false, address(tokenBridge));
+        emit MessageProcessedWithoutToken(message.messageId, BSC_CHAIN_SELECTOR);
         vm.prank(address(router));
         tokenBridge.ccipReceive(message);
 
@@ -534,9 +584,13 @@ contract TokenBridgeTest is Test {
         bytes memory args =
             Client._argsToBytes(Client.EVMExtraArgsV2({gasLimit: 300_000, allowOutOfOrderExecution: true}));
 
+        vm.expectEmit(false, false, false, true, address(tokenBridge));
+        emit ChainWhitelisted(newChain);
         tokenBridge.setWhitelistedChain(newChain, true, args);
         assertTrue(tokenBridge.whitelistedChains(newChain));
 
+        vm.expectEmit(false, false, false, true, address(tokenBridge));
+        emit ChainRemoved(newChain);
         tokenBridge.setWhitelistedChain(newChain, false, "");
         assertFalse(tokenBridge.whitelistedChains(newChain));
     }
@@ -544,9 +598,13 @@ contract TokenBridgeTest is Test {
     function test_setWhitelistedSender() public {
         address newSender = signers[0];
 
+        vm.expectEmit(false, false, false, true, address(tokenBridge));
+        emit SenderWhitelisted(newSender);
         tokenBridge.setWhitelistedSender(newSender, true);
         assertTrue(tokenBridge.whitelistedSenders(newSender));
 
+        vm.expectEmit(false, false, false, true, address(tokenBridge));
+        emit SenderRemoved(newSender);
         tokenBridge.setWhitelistedSender(newSender, false);
         assertFalse(tokenBridge.whitelistedSenders(newSender));
     }
@@ -683,6 +741,65 @@ contract TokenBridgeTest is Test {
         // Test a random interface id that we don't support
         bytes4 randomInterfaceId = 0x12345678;
         assertFalse(tokenBridge.supportsInterface(randomInterfaceId));
+    }
+
+    function _findLog(Vm.Log[] memory logs, bytes32 topic) private pure returns (Vm.Log memory, bool) {
+        for (uint256 i; i < logs.length; ++i) {
+            if (logs[i].topics.length > 0 && logs[i].topics[0] == topic) {
+                return (logs[i], true);
+            }
+        }
+
+        Vm.Log memory empty;
+        return (empty, false);
+    }
+
+    function _topicToAddress(bytes32 topic) private pure returns (address) {
+        return address(uint160(uint256(topic)));
+    }
+
+    function _assertTokensBridgedLog(
+        Vm.Log[] memory logs,
+        bytes32 expectedMessageId,
+        address expectedSender,
+        address expectedReceiver,
+        uint256 expectedAmount,
+        address expectedFeeToken,
+        uint256 expectedFee
+    ) private view {
+        (Vm.Log memory log, bool found) = _findLog(
+            logs, keccak256("TokensBridged(bytes32,address,address,uint256,uint64,address,uint256)")
+        );
+        assertTrue(found, "TokensBridged event missing");
+        assertEq(log.emitter, address(tokenBridge), "unexpected emitter");
+        assertEq(log.topics[1], expectedMessageId, "messageId mismatch");
+        assertEq(_topicToAddress(log.topics[2]), expectedSender, "sender mismatch");
+        assertEq(_topicToAddress(log.topics[3]), expectedReceiver, "receiver mismatch");
+
+        (uint256 amount, uint64 destinationSelector, address feeToken, uint256 fee) =
+            abi.decode(log.data, (uint256, uint64, address, uint256));
+        assertEq(amount, expectedAmount, "amount mismatch");
+        assertEq(destinationSelector, BSC_CHAIN_SELECTOR, "destination mismatch");
+        assertEq(feeToken, expectedFeeToken, "fee token mismatch");
+        assertEq(fee, expectedFee, "fee mismatch");
+    }
+
+    function _assertTokensReceivedLog(
+        Vm.Log[] memory logs,
+        bytes32 expectedMessageId,
+        address expectedReceiver,
+        uint256 expectedAmount,
+        uint64 expectedSourceSelector
+    ) private view {
+        (Vm.Log memory log, bool found) = _findLog(logs, keccak256("TokensReceived(bytes32,address,uint256,uint64)"));
+        assertTrue(found, "TokensReceived event missing");
+        assertEq(log.emitter, address(tokenBridge), "unexpected emitter");
+        assertEq(log.topics[1], expectedMessageId, "messageId mismatch");
+        assertEq(_topicToAddress(log.topics[2]), expectedReceiver, "receiver mismatch");
+
+        uint256 amount = abi.decode(log.data, (uint256));
+        assertEq(amount, expectedAmount, "amount mismatch");
+        assertEq(uint64(uint256(log.topics[3])), expectedSourceSelector, "source mismatch");
     }
 
     receive() external payable {}

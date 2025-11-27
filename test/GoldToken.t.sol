@@ -8,6 +8,7 @@ import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.s
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {MockV3Aggregator} from "@chainlink/contracts/src/v0.8/tests/MockV3Aggregator.sol";
 import {GoldReference} from "./utils/GoldReference.sol";
+import {ContractThatRejectsEth} from "./mock/ContractThatRejectsEth.sol";
 
 contract GoldTokenTest is Test {
     GoldToken public goldToken;
@@ -30,6 +31,13 @@ contract GoldTokenTest is Test {
     address internal defaultFeesAddress;
 
     bytes32 public constant OWNER_ROLE = keccak256("OWNER_ROLE");
+
+    event GoldTokenInitialized(address indexed owner, address indexed dataFeedGold, address indexed dataFeedEth);
+    event FeesAddressUpdated(address indexed previousFeesAddress, address indexed newFeesAddress);
+    event LotterieAddressUpdated(address indexed previousLotterieAddress, address indexed newLotterieAddress);
+    event UserAdded(address indexed user, uint256 timestamp);
+    event UserRemoved(address indexed user);
+    event Mint(address indexed to, uint256 amount);
 
     function setUp() public {
         uint256 id;
@@ -109,14 +117,58 @@ contract GoldTokenTest is Test {
         address feesAddress = goldToken.getFeesAddress();
         assertEq(feesAddress, address(this));
 
+        vm.expectEmit(true, true, false, false, address(goldToken));
+        emit FeesAddressUpdated(address(this), address(signers[0]));
         goldToken.setFeesAddress(address(signers[0]));
 
         feesAddress = goldToken.getFeesAddress();
         assertEq(feesAddress, address(signers[0]));
     }
 
+    function test_initialize_emits_event() public {
+        GoldToken implementation = new GoldToken();
+        vm.expectEmit(true, false, false, true);
+        emit GoldTokenInitialized(address(this), address(goldAggregator), address(ethAggregator));
+        new ERC1967Proxy(
+            address(implementation),
+            abi.encodeWithSelector(
+                GoldToken.initialize.selector, address(this), address(goldAggregator), address(ethAggregator)
+            )
+        );
+    }
+
+    function test_mint_emits_user_added_event() public {
+        vm.deal(address(this), 1 ether);
+        vm.expectEmit(true, false, false, true, address(goldToken));
+        emit UserAdded(address(this), block.timestamp);
+        goldToken.mint{value: 0.1 ether}();
+    }
+
+    function test_mint_emits_mint_event() public {
+        vm.deal(address(this), 1 ether);
+        int256 goldPrice = goldAggregator.latestAnswer();
+        int256 ethPrice = ethAggregator.latestAnswer();
+        (uint256 expectedUserMint,,) = GoldReference.calcMintBreakdown(1 ether, goldPrice, ethPrice);
+
+        vm.expectEmit(true, false, false, true, address(goldToken));
+        emit Mint(address(this), expectedUserMint);
+        goldToken.mint{value: 1 ether}();
+    }
+
+    function test_burn_emits_user_removed_event() public {
+        vm.deal(address(this), 1 ether);
+        goldToken.mint{value: 0.1 ether}();
+
+        uint256 balance = goldToken.balanceOf(address(this));
+        vm.expectEmit(true, false, false, false, address(goldToken));
+        emit UserRemoved(address(this));
+        goldToken.burn(balance);
+    }
+
     /// @notice Table-driven test for various mint scenarios. Check https://getfoundry.sh/forge/advanced-testing/table-testing/ for more details.
     function tableMintScenario(MintScenario memory mintScenario) public {
+        vm.expectEmit(true, true, false, false, address(goldToken));
+        emit LotterieAddressUpdated(DEFAULT_LOTTERIE, TABLE_LOTTERIE);
         goldToken.setLotterieAddress(TABLE_LOTTERIE);
         goldToken.setFeesAddress(TABLE_FEES);
 
@@ -189,8 +241,28 @@ contract GoldTokenTest is Test {
     }
 
     function test_claimEth() public {
-        goldToken.mint{value: 10000}();
+        vm.deal(address(this), 1 ether);
+        uint256 ownerBalanceBefore = address(this).balance;
+        uint256 depositAmount = 0.25 ether;
+        goldToken.mint{value: depositAmount}();
+        assertEq(address(goldToken).balance, depositAmount, "contract should hold deposited ETH");
+
         goldToken.claimEth();
+
+        assertEq(address(goldToken).balance, 0, "contract balance should be zero after withdrawal");
+        assertEq(address(this).balance, ownerBalanceBefore, "owner should recover the deposited ETH");
+    }
+
+    function test_claimEth_reverts_on_failed_transfer() public {
+        ContractThatRejectsEth reverter = new ContractThatRejectsEth();
+        goldToken.addOwner(address(reverter));
+
+        vm.deal(address(this), 1 ether);
+        goldToken.mint{value: 0.1 ether}();
+        assertEq(address(goldToken).balance, 0.1 ether, "contract should hold deposited ETH");
+
+        vm.expectRevert(IGoldToken.EthTransferFailed.selector);
+        reverter.claimGoldTokenEth(goldToken);
     }
 
     function test_getUsers() public {

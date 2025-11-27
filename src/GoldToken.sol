@@ -10,28 +10,51 @@ import {
 } from "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20PausableUpgradeable.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 /**
  * @title GoldToken
  * @notice ERC-20 token representing on-chain grams of gold redeemable via ETH deposits and burns
  * @dev Upgradeable (UUPS) contract that relies on Chainlink price feeds and exposes hooks for the Lotterie module
  */
-contract GoldToken is Initializable, ERC20PausableUpgradeable, AccessControlUpgradeable, UUPSUpgradeable, IGoldToken {
+contract GoldToken is
+    Initializable,
+    ERC20PausableUpgradeable,
+    AccessControlUpgradeable,
+    UUPSUpgradeable,
+    ReentrancyGuard,
+    IGoldToken
+{
     /*//////////////////////////////////////////////////////////////
                             STATE VARIABLES
     //////////////////////////////////////////////////////////////*/
 
+    /// @notice Role identifier governing privileged token operations and upgrades
     bytes32 public constant OWNER_ROLE = keccak256("OWNER_ROLE");
 
+    /// @notice Chainlink feed returning the USD price of one troy ounce of gold
     AggregatorV3Interface internal _dataFeedGold;
+
+    /// @notice Chainlink feed returning the USD price of one ETH
     AggregatorV3Interface internal _dataFeedEth;
 
+    /// @notice Protocol fee percentage expressed in whole percents (e.g., 5 = 5%)
     uint256 internal _fees;
+
+    /// @notice Address receiving the treasury portion of mint fees
     address internal _feesAddress;
+
+    /// @notice Lotterie contract that receives half of the mint fees and manages rewards
     address internal _lotterieAddress;
 
+    /// @notice Minimum GLD balance that keeps an account eligible for lottery participation
     uint256 internal _minimumGoldToBlock;
-    mapping(address => uint256) internal _timestamps;
+
+    /// @notice Tracks the first interaction timestamp for each lottery participant
+    /// @dev Maps user address => timestamp of entry
+    mapping(address user => uint256 lastInteraction) internal _timestamps;
+
+    /// @notice Dynamic list of addresses currently eligible for lottery draws
     address[] internal _users;
 
     /*//////////////////////////////////////////////////////////////
@@ -45,7 +68,7 @@ contract GoldToken is Initializable, ERC20PausableUpgradeable, AccessControlUpgr
 
     /// @inheritdoc IGoldToken
     function initialize(address owner, address dataFeedGoldAddress, address dataFeedEthAddress)
-        public
+        external
         override
         initializer
     {
@@ -67,6 +90,8 @@ contract GoldToken is Initializable, ERC20PausableUpgradeable, AccessControlUpgr
         _fees = 5; // 5%
         _feesAddress = owner;
         _minimumGoldToBlock = 1 ether; // 1 GLD
+
+        emit GoldTokenInitialized(owner, dataFeedGoldAddress, dataFeedEthAddress);
     }
 
     /// @dev Restricts upgrades to addresses holding OWNER_ROLE
@@ -91,18 +116,26 @@ contract GoldToken is Initializable, ERC20PausableUpgradeable, AccessControlUpgr
     //////////////////////////////////////////////////////////////*/
 
     /// @inheritdoc IGoldToken
-    function claimEth() external override onlyRole(OWNER_ROLE) {
-        payable(msg.sender).transfer(address(this).balance);
+    function claimEth() external override onlyRole(OWNER_ROLE) nonReentrant {
+        uint256 payout = address(this).balance;
+        (bool success,) = payable(msg.sender).call{value: payout}("");
+        if (!success) {
+            revert EthTransferFailed();
+        }
     }
 
     /// @inheritdoc IGoldToken
     function setFeesAddress(address feesAddress) external override onlyRole(OWNER_ROLE) {
+        address previous = _feesAddress;
         _feesAddress = feesAddress;
+        emit FeesAddressUpdated(previous, feesAddress);
     }
 
     /// @inheritdoc IGoldToken
     function setLotterieAddress(address lotterieAddress) external override onlyRole(OWNER_ROLE) {
+        address previous = _lotterieAddress;
         _lotterieAddress = lotterieAddress;
+        emit LotterieAddressUpdated(previous, lotterieAddress);
     }
 
     /// @inheritdoc IGoldToken
@@ -177,22 +210,25 @@ contract GoldToken is Initializable, ERC20PausableUpgradeable, AccessControlUpgr
     }
 
     /// @dev Removes a user from the lottery pool and clears their timestamp
-    function _removeUser(address user) internal {
+    function _removeUser(address user) private {
         _timestamps[user] = 0;
-        for (uint256 i = 0; i < _users.length; i++) {
+        uint256 length = _users.length;
+        for (uint256 i; i < length; i++) {
             if (_users[i] == user) {
                 _users[i] = _users[_users.length - 1];
                 _users.pop();
+                emit UserRemoved(user);
                 break;
             }
         }
     }
 
     /// @dev Adds a user to the lottery pool on first interaction
-    function _addUser(address user) internal {
+    function _addUser(address user) private {
         if (_timestamps[user] == 0) {
             _users.push(user);
             _timestamps[user] = block.timestamp;
+            emit UserAdded(user, block.timestamp);
         }
     }
 
@@ -203,10 +239,10 @@ contract GoldToken is Initializable, ERC20PausableUpgradeable, AccessControlUpgr
     /// @inheritdoc IGoldToken
     function getGoldPriceInEth() public view override returns (int256) {
         (, int256 goldUsdPerTroyOunce,,,) = _dataFeedGold.latestRoundData(); // Price per troy ounce (31.1034768 g) = x USD (8 decimals)
-        int256 goldUsdPerGram = (goldUsdPerTroyOunce * 10_000_000) / 311_034_768; // Multiply first to preserve precision
+        int256 goldUsdPerGram = (goldUsdPerTroyOunce * 10_000_000) / 311_034_768;
 
         (, int256 ethUsd,,,) = _dataFeedEth.latestRoundData(); // 1 ETH = y USD (8 decimals)
-        return goldUsdPerGram * 10 ** 8 / ethUsd; // Multiply first to preserve precision
+        return goldUsdPerGram * 10 ** 8 / ethUsd;
     }
 
     /// @inheritdoc IGoldToken
@@ -228,7 +264,7 @@ contract GoldToken is Initializable, ERC20PausableUpgradeable, AccessControlUpgr
     function getTimestamps() external view override returns (address[] memory, uint256[] memory) {
         uint256 length = _users.length;
         uint256[] memory timestamps = new uint256[](length);
-        for (uint256 i = 0; i < length; i++) {
+        for (uint256 i; i < length; ++i) {
             timestamps[i] = _timestamps[_users[i]];
         }
         return (_users, timestamps);

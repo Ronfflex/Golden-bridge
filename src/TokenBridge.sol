@@ -66,15 +66,15 @@ contract TokenBridge is
 
     /// @notice Tracks processed CCIP messages to prevent duplicates
     /// @dev Maps messageId => processed status
-    mapping(bytes32 => bool) public override processedMessages;
+    mapping(bytes32 messageId => bool wasProcessed) public override processedMessages;
 
     /// @notice Stores configuration for each supported chain
     /// @dev Maps chainSelector => ChainDetails
-    mapping(uint64 => ChainDetails) private _chainDetails;
+    mapping(uint64 chainSelector => ChainDetails details) private _chainDetails;
 
     /// @notice Tracks authorized cross-chain senders
     /// @dev Maps sender address => authorization status
-    mapping(address => bool) public override whitelistedSenders;
+    mapping(address sender => bool allowed) public override whitelistedSenders;
 
     /*//////////////////////////////////////////////////////////////
                                MODIFIERS
@@ -103,7 +103,7 @@ contract TokenBridge is
      * @dev Sets up initial chain configuration with default CCIP gas parameters for the destination chain
      */
     function initialize(address owner, address _link, address _goldToken, uint64 _destinationChainSelector)
-        public
+        external
         initializer
     {
         __AccessControl_init();
@@ -128,6 +128,7 @@ contract TokenBridge is
         });
 
         emit ChainWhitelisted(_destinationChainSelector);
+        emit TokenBridgeInitialized(owner, _link, _goldToken, _destinationChainSelector);
     }
 
     /**
@@ -178,7 +179,7 @@ contract TokenBridge is
         payable
         nonReentrant
         whenNotPaused
-        returns (bytes32 messageId)
+        returns (bytes32)
     {
         address feeToken = payFeesIn == PayFeesIn.LINK ? link : address(0);
         return _bridgeTokens(receiver, amount, feeToken);
@@ -192,9 +193,9 @@ contract TokenBridge is
      * @return messageId Unique identifier for the transaction
      */
     function _bridgeTokens(address receiver, uint256 amount, address feeToken)
-        internal
+        private
         onlyEnabledChain(destinationChainSelector)
-        returns (bytes32 messageId)
+        returns (bytes32)
     {
         if (amount == 0) revert InvalidAmount(amount);
         if (receiver == address(0)) revert InvalidSender(receiver);
@@ -230,7 +231,7 @@ contract TokenBridge is
             }
         }
 
-        messageId = router.ccipSend{value: feeToken == address(0) ? fees : 0}(destinationChainSelector, message);
+        bytes32 messageId = router.ccipSend{value: feeToken == address(0) ? fees : 0}(destinationChainSelector, message);
 
         emit TokensBridged(messageId, msg.sender, receiver, amount, destinationChainSelector, feeToken, fees);
 
@@ -257,11 +258,12 @@ contract TokenBridge is
         address receiver = abi.decode(message.data, (address));
         if (receiver == address(0)) revert InvalidSender(address(0));
 
-        bool foundGoldToken = false;
-        uint256 tokenAmount = 0;
+        bool foundGoldToken;
+        uint256 tokenAmount;
 
-        if (message.destTokenAmounts.length > 0) {
-            for (uint256 i = 0; i < message.destTokenAmounts.length; i++) {
+        uint256 tokensLength = message.destTokenAmounts.length;
+        if (tokensLength > 0) {
+            for (uint256 i; i < tokensLength; ++i) {
                 if (message.destTokenAmounts[i].token == goldToken) {
                     foundGoldToken = true;
                     tokenAmount = message.destTokenAmounts[i].amount;
@@ -279,6 +281,7 @@ contract TokenBridge is
 
         if (!foundGoldToken) {
             processedMessages[message.messageId] = true;
+            emit MessageProcessedWithoutToken(message.messageId, message.sourceChainSelector);
         }
     }
 
@@ -287,7 +290,7 @@ contract TokenBridge is
      * @dev Unwrapped onlyEnabledChain modifier logic to reduce bytecode size
      * @param chainSelector The chain selector to verify
      */
-    function _onlyEnabledChain(uint64 chainSelector) internal view {
+    function _onlyEnabledChain(uint64 chainSelector) private view {
         if (!_chainDetails[chainSelector].isEnabled) {
             revert ChainNotWhitelisted(chainSelector);
         }
