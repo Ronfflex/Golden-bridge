@@ -1,0 +1,190 @@
+/* Full Step Indicator */
+.stepIndicator {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+}
+
+.step {
+    display: flex;
+    align-items: flex-start;
+    gap: 1rem;
+    padding: 1rem;
+    border-radius: var(--radius-md);
+    transition: background-color 0.2s ease;
+}
+
+.step.clickable {
+    cursor: pointer;
+}
+
+.step.clickable:hover {
+    background-color: rgba(255, 255, 255, 0.05);
+}
+
+.stepIcon {
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.125rem;
+    flex-shrink: 0;
+    transition: all 0.2s ease;
+}
+
+.step.completed .stepIcon {
+    background-color: var(--color-success);
+    color: white;
+}
+
+.step.current .stepIcon {
+    background-color: var(--color-primary);
+    color: var(--color-background);
+    box-shadow: 0 0 0 4px rgba(255, 215, 0, 0.2);
+}
+
+.step.upcoming .stepIcon {
+    background-color: var(--color-border);
+    color: var(--color-text-muted);
+}
+
+.checkmark {
+    font-weight: bold;
+}
+
+.stepContent {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    padding-top: 0.5rem;
+}
+
+.stepLabel {
+    font-weight: 600;
+    font-size: 1rem;
+    color: var(--color-text);
+}
+
+.step.upcoming .stepLabel {
+    color: var(--color-text-muted);
+}
+
+.stepDescription {
+    font-size: 0.875rem;
+    color: var(--color-text-muted);
+}
+
+.connector {
+    width: 2px;
+    height: 1.5rem;
+    background-color: var(--color-border);
+    margin-left: calc(1rem + 1.25rem - 1px);
+    transition: background-color 0.2s ease;
+}
+
+.connectorCompleted {
+    background-color: var(--color-success);
+}
+
+/* Compact Horizontal Indicator */
+.compactIndicator {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    padding: 0.75rem 1rem;
+    background-color: rgba(0, 0, 0, 0.2);
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--color-border);
+    overflow-x: auto;
+}
+
+.compactStep {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    border-radius: var(--radius-md);
+    white-space: nowrap;
+    transition: all 0.2s ease;
+}
+
+.compactIcon {
+    width: 1.5rem;
+    height: 1.5rem;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+    flex-shrink: 0;
+}
+
+.compactLabel {
+    font-size: 0.8125rem;
+    font-weight: 500;
+}
+
+/* Compact Status Styles */
+.compact-completed .compactIcon {
+    background-color: var(--color-success);
+    color: white;
+}
+
+.compact-completed .compactLabel {
+    color: var(--color-success);
+}
+
+.compact-current {
+    background-color: rgba(255, 215, 0, 0.1);
+}
+
+.compact-current .compactIcon {
+    background-color: var(--color-primary);
+    color: var(--color-background);
+}
+
+.compact-current .compactLabel {
+    color: var(--color-primary);
+    font-weight: 600;
+}
+
+.compact-upcoming .compactIcon {
+    background-color: var(--color-border);
+    color: var(--color-text-muted);
+}
+
+.compact-upcoming .compactLabel {
+    color: var(--color-text-muted);
+}
+
+.compactConnector {
+    width: 1.5rem;
+    height: 2px;
+    background-color: var(--color-border);
+    flex-shrink: 0;
+}
+
+.compactConnectorCompleted {
+    background-color: var(--color-success);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .compactIndicator {
+        padding: 0.5rem;
+    }
+
+    .compactStep {
+        padding: 0.375rem 0.5rem;
+    }
+
+    .compactLabel {
+        display: none;
+    }
+
+    .compactConnector {
+        width: 1rem;
+    }
+}

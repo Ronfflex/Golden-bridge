@@ -1,0 +1,136 @@
+.tooltipWrapper {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+}
+
+.tooltip {
+    position: absolute;
+    z-index: 1000;
+    pointer-events: none;
+    animation: fadeIn 0.15s ease-in-out;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(4px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.tooltipContent {
+    background-color: var(--color-secondary);
+    color: var(--color-text);
+    padding: 0.5rem 0.75rem;
+    border-radius: var(--radius-md);
+    font-size: 0.8125rem;
+    line-height: 1.4;
+    max-width: 280px;
+    box-shadow: var(--shadow-lg);
+    border: 1px solid var(--color-border);
+    white-space: normal;
+}
+
+.arrow {
+    position: absolute;
+    width: 8px;
+    height: 8px;
+    background-color: var(--color-secondary);
+    border: 1px solid var(--color-border);
+    transform: rotate(45deg);
+}
+
+/* Position: Top */
+.top {
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    margin-bottom: 8px;
+}
+
+.top .arrow {
+    bottom: -5px;
+    left: 50%;
+    transform: translateX(-50%) rotate(45deg);
+    border-top: none;
+    border-left: none;
+}
+
+/* Position: Bottom */
+.bottom {
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    margin-top: 8px;
+}
+
+.bottom .arrow {
+    top: -5px;
+    left: 50%;
+    transform: translateX(-50%) rotate(45deg);
+    border-bottom: none;
+    border-right: none;
+}
+
+/* Position: Left */
+.left {
+    right: 100%;
+    top: 50%;
+    transform: translateY(-50%);
+    margin-right: 8px;
+}
+
+.left .arrow {
+    right: -5px;
+    top: 50%;
+    transform: translateY(-50%) rotate(45deg);
+    border-left: none;
+    border-bottom: none;
+}
+
+/* Position: Right */
+.right {
+    left: 100%;
+    top: 50%;
+    transform: translateY(-50%);
+    margin-left: 8px;
+}
+
+.right .arrow {
+    left: -5px;
+    top: 50%;
+    transform: translateY(-50%) rotate(45deg);
+    border-right: none;
+    border-top: none;
+}
+
+/* Info Icon */
+.infoIcon {
+    cursor: help;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0.7;
+    transition: opacity 0.2s ease;
+}
+
+.infoIcon:hover {
+    opacity: 1;
+}
+
+.icon-sm {
+    font-size: 0.75rem;
+}
+
+.icon-md {
+    font-size: 0.875rem;
+}
+
+.icon-lg {
+    font-size: 1rem;
+}

@@ -1,0 +1,175 @@
+.card {
+    height: 100%;
+}
+
+.headerTitle {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.networkFlow {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1.5rem;
+    padding: 1.25rem;
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(139, 92, 246, 0.1) 100%);
+    border: 1px solid rgba(59, 130, 246, 0.2);
+    border-radius: var(--radius-md);
+}
+
+.networkNode {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-width: 120px;
+}
+
+.networkLabel {
+    font-size: 0.75rem;
+    color: var(--color-text-muted);
+    margin-bottom: 0.25rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.networkValue {
+    font-weight: 600;
+    color: var(--color-text);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.arrow {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.25rem;
+    color: var(--color-primary);
+}
+
+.arrowIcon {
+    font-size: 1.5rem;
+    animation: pulse 2s infinite;
+}
+
+.arrowLabel {
+    font-size: 0.625rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--color-text-muted);
+}
+
+@keyframes pulse {
+
+    0%,
+    100% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0.5;
+    }
+}
+
+.liquidityInfo {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+    padding: 0.75rem 1rem;
+    background-color: rgba(59, 130, 246, 0.1);
+    border: 1px solid rgba(59, 130, 246, 0.2);
+    border-radius: var(--radius-md);
+}
+
+.liquidityLabel {
+    font-size: 0.875rem;
+    color: #93C5FD;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.liquidityValue {
+    font-weight: 700;
+    color: #93C5FD;
+}
+
+.inputLabel {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.feeSelection {
+    margin-bottom: 1rem;
+    padding: 1rem;
+    background-color: rgba(0, 0, 0, 0.2);
+    border-radius: var(--radius-md);
+}
+
+.feeLabel {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--color-text);
+    margin-bottom: 0.75rem;
+}
+
+.radioGroup {
+    display: flex;
+    gap: 1.5rem;
+}
+
+.radioLabel {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    cursor: pointer;
+    font-size: 0.875rem;
+    padding: 0.5rem 0.75rem;
+    border-radius: var(--radius-md);
+    transition: background-color 0.2s ease;
+}
+
+.radioLabel:hover {
+    background-color: rgba(255, 255, 255, 0.05);
+}
+
+.radioLabel input[type="radio"] {
+    accent-color: var(--color-primary);
+}
+
+.radioText {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.infoNote {
+    margin-top: 1.5rem;
+}
+
+.toggleEducation {
+    display: block;
+    width: 100%;
+    margin-top: 1.5rem;
+    padding: 0.5rem;
+    background: transparent;
+    border: 1px dashed var(--color-border);
+    border-radius: var(--radius-md);
+    color: var(--color-text-muted);
+    font-size: 0.8125rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.toggleEducation:hover {
+    border-color: var(--color-primary);
+    color: var(--color-primary);
+}
