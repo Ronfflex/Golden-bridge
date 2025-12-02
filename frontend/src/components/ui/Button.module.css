@@ -72,6 +72,21 @@
     height: 3rem;
 }
 
+/* Mobile touch target adjustments */
+@media (max-width: 640px) {
+    .md {
+        height: 2.75rem;
+        /* Larger touch target */
+        padding: 0.625rem 1.25rem;
+    }
+
+    .lg {
+        height: 3.25rem;
+        /* Larger touch target */
+        padding: 0.875rem 1.75rem;
+    }
+}
+
 .fullWidth {
     width: 100%;
 }

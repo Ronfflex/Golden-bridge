@@ -19,6 +19,24 @@
     border-radius: var(--radius-md);
 }
 
+/* Mobile adjustments for network flow */
+@media (max-width: 640px) {
+    .networkFlow {
+        flex-direction: column;
+        gap: 1rem;
+        text-align: center;
+    }
+
+    .networkNode {
+        min-width: auto;
+        width: 100%;
+    }
+
+    .arrow {
+        transform: rotate(90deg);
+    }
+}
+
 .networkNode {
     display: flex;
     flex-direction: column;
@@ -85,6 +103,25 @@
     border-radius: var(--radius-md);
 }
 
+/* Mobile adjustments for liquidity info */
+@media (max-width: 640px) {
+    .liquidityInfo {
+        flex-direction: column;
+        gap: 0.5rem;
+        text-align: center;
+        padding: 0.625rem 0.75rem;
+        margin-bottom: 1rem;
+    }
+
+    .liquidityLabel {
+        font-size: 0.8125rem;
+    }
+
+    .liquidityValue {
+        font-size: 0.9rem;
+    }
+}
+
 .liquidityLabel {
     font-size: 0.875rem;
     color: #93C5FD;
@@ -111,6 +148,19 @@
     border-radius: var(--radius-md);
 }
 
+/* Mobile adjustments for fee selection */
+@media (max-width: 640px) {
+    .feeSelection {
+        margin-bottom: 0.75rem;
+        padding: 0.75rem;
+    }
+
+    .feeLabel {
+        font-size: 0.8125rem;
+        margin-bottom: 0.625rem;
+    }
+}
+
 .feeLabel {
     display: flex;
     align-items: center;
@@ -126,6 +176,14 @@
     gap: 1.5rem;
 }
 
+/* Mobile adjustments for radio group */
+@media (max-width: 640px) {
+    .radioGroup {
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+}
+
 .radioLabel {
     display: flex;
     align-items: center;
@@ -135,6 +193,16 @@
     padding: 0.5rem 0.75rem;
     border-radius: var(--radius-md);
     transition: background-color 0.2s ease;
+    min-height: 44px;
+    /* Touch target size */
+}
+
+/* Mobile adjustments for radio labels */
+@media (max-width: 640px) {
+    .radioLabel {
+        padding: 0.75rem;
+        font-size: 0.9rem;
+    }
 }
 
 .radioLabel:hover {
@@ -167,6 +235,19 @@
     font-size: 0.8125rem;
     cursor: pointer;
     transition: all 0.2s ease;
+    min-height: 44px;
+    /* Touch target */
+}
+
+/* Mobile adjustments for toggle education */
+@media (max-width: 640px) {
+    .toggleEducation {
+        margin-top: 1rem;
+        padding: 0.75rem;
+        min-height: 48px;
+        /* Larger touch target */
+        font-size: 0.875rem;
+    }
 }
 
 .toggleEducation:hover {

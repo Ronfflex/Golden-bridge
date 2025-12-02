@@ -171,10 +171,31 @@ export const useLotterie = () => {
     try {
       const contract = await getContract(true);
       const tx = await contract.randomDraw();
-      await tx.wait();
-      // We might want to return the requestId from the event here, but for now just void
+      const receipt = await tx.wait();
+
+      // Extract requestId from transaction receipt if available
+      const requestId = receipt?.logs?.[0]?.args?.[0];
+      console.log("VRF Request initiated with ID:", requestId?.toString());
+
+      return requestId;
     } catch (err: any) {
-      setError(err.message || "Failed to initiate random draw");
+      console.error("VRF Random Draw Error:", err);
+
+      // Provide specific error messages for common VRF issues
+      let errorMessage = "Failed to initiate random draw";
+      if (err.message?.includes("gas")) {
+        errorMessage = "Gas estimation failed. Please try again.";
+      } else if (err.message?.includes("OneRandomDrawPerDay")) {
+        errorMessage =
+          "Random draw can only be performed once per day. Please try again tomorrow.";
+      } else if (err.message?.includes("execution reverted")) {
+        errorMessage =
+          "Transaction reverted. Please check your permissions and try again.";
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
+
+      setError(errorMessage);
       throw err;
     } finally {
       setLoading(false);
@@ -356,12 +377,67 @@ export const useLotterie = () => {
     [getContract]
   );
 
+  // Diagnostic function to check VRF configuration
+  const checkVrfConfiguration = useCallback(async () => {
+    try {
+      const [
+        subscriptionId,
+        coordinator,
+        keyHash,
+        callbackGasLimit,
+        requestConfirmations,
+        numWords,
+      ] = await Promise.all([
+        getVrfSubscriptionId(),
+        getVrfCoordinator(),
+        getKeyHash(),
+        getCallbackGasLimit(),
+        getRequestConfirmations(),
+        getNumWords(),
+      ]);
+
+      console.log("VRF Configuration Check:");
+      console.log("- Subscription ID:", subscriptionId.toString());
+      console.log("- Coordinator:", coordinator);
+      console.log("- Key Hash:", keyHash);
+      console.log("- Callback Gas Limit:", callbackGasLimit.toString());
+      console.log("- Request Confirmations:", requestConfirmations.toString());
+      console.log("- Num Words:", numWords.toString());
+
+      return {
+        subscriptionId,
+        coordinator,
+        keyHash,
+        callbackGasLimit,
+        requestConfirmations,
+        numWords,
+      };
+    } catch (err: any) {
+      console.error("VRF Configuration Check Failed:", err);
+      setError(err.message || "Failed to check VRF configuration");
+      throw err;
+    }
+  }, [
+    getVrfSubscriptionId,
+    getVrfCoordinator,
+    getKeyHash,
+    getCallbackGasLimit,
+    getRequestConfirmations,
+    getNumWords,
+  ]);
+
+  // Function to manually clear error state
+  const clearError = useCallback(() => {
+    setError(null);
+  }, []);
+
   return {
     loading,
     error,
     contractAddress,
     isConnected,
     address,
+    clearError,
     claim,
     getGains,
     getLastRequestId,
@@ -384,5 +460,6 @@ export const useLotterie = () => {
     addOwner,
     removeOwner,
     hasOwnerRole,
+    checkVrfConfiguration,
   };
 };

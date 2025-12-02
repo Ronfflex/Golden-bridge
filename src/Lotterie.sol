@@ -93,9 +93,9 @@ contract Lotterie is
         _vrfSubscriptionId = vrfSubscriptionId;
         s_vrfCoordinator = IVRFCoordinatorV2Plus(vrfCoordinator);
         _vrfKeyHash = keyHash;
-        _callbackGasLimit = callbackGasLimit; // 40000
-        _requestConfirmations = requestConfirmations; // 3
-        _numWords = numWords; // 1
+        _callbackGasLimit = callbackGasLimit;
+        _requestConfirmations = requestConfirmations;
+        _numWords = numWords;
 
         _lastRandomDraw = block.timestamp - 1 days;
         _goldToken = IGoldToken(goldToken);

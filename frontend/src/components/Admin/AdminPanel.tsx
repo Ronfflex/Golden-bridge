@@ -31,7 +31,12 @@ export const AdminPanel: React.FC = () => {
     setLotterieAddress,
   } = useGoldToken();
 
-  const { loading: lotterieLoading, randomDraw } = useLotterie();
+  const {
+    loading: lotterieLoading,
+    randomDraw,
+    clearError,
+    checkVrfConfiguration,
+  } = useLotterie();
 
   const {
     loading: bridgeLoading,
@@ -144,10 +149,38 @@ export const AdminPanel: React.FC = () => {
   const handleRandomDraw = async () => {
     try {
       setErrorMsg(null);
-      await randomDraw();
-      setSuccessMsg("Random draw initiated! Waiting for VRF callback...");
+      const requestId = await randomDraw();
+      if (requestId) {
+        setSuccessMsg(
+          `Random draw initiated! Request ID: ${requestId.toString()}. Waiting for VRF callback...`
+        );
+      } else {
+        setSuccessMsg("Random draw initiated! Waiting for VRF callback...");
+      }
     } catch (err: any) {
+      console.error("Random draw failed:", err);
       setErrorMsg(err.message || "Failed to initiate random draw");
+    }
+  };
+
+  const handleRetryRandomDraw = () => {
+    setErrorMsg(null);
+    setSuccessMsg(null);
+    clearError();
+  };
+
+  const handleCheckVrfConfig = async () => {
+    try {
+      setErrorMsg(null);
+      setSuccessMsg(null);
+      const config = await checkVrfConfiguration();
+      console.log("VRF Configuration:", config);
+      setSuccessMsg("VRF configuration checked. See console for details.");
+    } catch (err: any) {
+      console.error("VRF config check error:", err);
+      setErrorMsg(
+        "Failed to check VRF configuration. See console for details."
+      );
     }
   };
 
@@ -402,15 +435,43 @@ export const AdminPanel: React.FC = () => {
             </div>
 
             <div className={styles.adminActions}>
-              <Tooltip content="Initiate a new lottery draw using Chainlink VRF. Can only be done once per day.">
-                <button
-                  className={`${styles.adminButton} ${styles.adminButtonPrimary}`}
-                  onClick={handleRandomDraw}
-                  disabled={lotterieLoading}
-                >
-                  🎲 Trigger Random Draw
-                </button>
-              </Tooltip>
+              <div className={styles.adminActions}>
+                <Tooltip content="Initiate a new lottery draw using Chainlink VRF. Can only be done once per day.">
+                  <button
+                    className={`${styles.adminButton} ${styles.adminButtonPrimary}`}
+                    onClick={handleRandomDraw}
+                    disabled={lotterieLoading || !!errorMsg}
+                  >
+                    {lotterieLoading
+                      ? "⏳ Processing..."
+                      : "🎲 Trigger Random Draw"}
+                  </button>
+                </Tooltip>
+
+                {/* Retry Button - shown when there's an error */}
+                {errorMsg && (
+                  <Tooltip content="Clear the error state and try again">
+                    <button
+                      className={`${styles.adminButton} ${styles.adminButtonSecondary}`}
+                      onClick={handleRetryRandomDraw}
+                      disabled={lotterieLoading}
+                    >
+                      🔄 Retry
+                    </button>
+                  </Tooltip>
+                )}
+
+                {/* Debug Button - always visible for troubleshooting */}
+                <Tooltip content="Check VRF configuration and settings">
+                  <button
+                    className={`${styles.adminButton} ${styles.adminButtonSecondary}`}
+                    onClick={handleCheckVrfConfig}
+                    disabled={lotterieLoading}
+                  >
+                    🔧 Debug VRF
+                  </button>
+                </Tooltip>
+              </div>
             </div>
           </div>
         )}

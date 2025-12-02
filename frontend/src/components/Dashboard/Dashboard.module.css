@@ -1,7 +1,19 @@
 .container {
     max-width: 1280px;
     margin: 0 auto;
-    padding: 2rem;
+    padding: 1rem;
+}
+
+@media (min-width: 768px) {
+    .container {
+        padding: 1.5rem;
+    }
+}
+
+@media (min-width: 1024px) {
+    .container {
+        padding: 2rem;
+    }
 }
 
 .header {
@@ -13,14 +25,23 @@
     gap: 1rem;
 }
 
-.headerLeft {
-    flex: 1;
-}
-
 .headerRight {
     display: flex;
     align-items: center;
     gap: 1rem;
+}
+
+/* Mobile-specific adjustments */
+@media (max-width: 640px) {
+    .header {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0.75rem;
+    }
+
+    .headerRight {
+        justify-content: center;
+    }
 }
 
 .title {

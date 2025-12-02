@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {Script, console2} from "forge-std/Script.sol";
+import {Script, console2} from "forge-std/src/Script.sol";
 import {GoldToken} from "../src/GoldToken.sol";
 import {Lotterie} from "../src/Lotterie.sol";
 import {TokenBridge} from "../src/TokenBridge.sol";
@@ -69,7 +69,7 @@ contract DeployCoreContracts is Script {
     });
 
     // Chainlink VRF parameters (same for both networks)
-    uint32 constant CALLBACK_GAS_LIMIT = 40000;
+    uint32 constant CALLBACK_GAS_LIMIT = 100000;
     uint16 constant REQUEST_CONFIRMATIONS = 3;
     uint32 constant NUM_WORDS = 1;
 

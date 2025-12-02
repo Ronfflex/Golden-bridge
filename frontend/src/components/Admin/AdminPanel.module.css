@@ -222,6 +222,17 @@
     color: var(--color-primary);
 }
 
+.adminButtonSecondary {
+    border-color: var(--color-text-muted);
+    color: var(--color-text-muted);
+}
+
+.adminButtonSecondary:hover:not(:disabled) {
+    background: var(--color-surface);
+    border-color: var(--color-text);
+    color: var(--color-text);
+}
+
 /* Form Section */
 .formSection {
     margin-top: 1rem;

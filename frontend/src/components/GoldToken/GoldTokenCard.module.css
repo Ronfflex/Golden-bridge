@@ -18,6 +18,19 @@
     border-radius: var(--radius-md);
 }
 
+/* Mobile adjustments for stats grid */
+@media (max-width: 640px) {
+    .statsGrid {
+        grid-template-columns: 1fr;
+        gap: 0.75rem;
+        padding: 0.75rem;
+    }
+
+    .statItem {
+        padding: 0.5rem 0;
+    }
+}
+
 .statItem {
     display: flex;
     flex-direction: column;
@@ -59,6 +72,21 @@
     align-items: center;
     justify-content: center;
     gap: 0.5rem;
+    min-height: 44px;
+    /* Touch target */
+}
+
+/* Mobile adjustments for tabs */
+@media (max-width: 640px) {
+    .tab {
+        padding: 0.625rem 0.5rem;
+        font-size: 0.875rem;
+        gap: 0.25rem;
+    }
+
+    .tabIcon {
+        font-size: 0.75rem;
+    }
 }
 
 .tab:hover {
@@ -91,6 +119,24 @@
     border-radius: var(--radius-md);
     padding: 0.75rem 1rem;
     margin-bottom: 0.5rem;
+}
+
+/* Mobile adjustments for calculation box */
+@media (max-width: 640px) {
+    .calculationBox {
+        padding: 0.625rem 0.75rem;
+    }
+
+    .calcRow {
+        font-size: 0.8125rem;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.25rem;
+    }
+
+    .calcRow span:first-child {
+        font-size: 0.8125rem;
+    }
 }
 
 .calcRow {
@@ -147,6 +193,19 @@
     font-size: 0.8125rem;
     cursor: pointer;
     transition: all 0.2s ease;
+    min-height: 44px;
+    /* Touch target */
+}
+
+/* Mobile adjustments for toggle education */
+@media (max-width: 640px) {
+    .toggleEducation {
+        margin-top: 1rem;
+        padding: 0.75rem;
+        min-height: 48px;
+        /* Larger touch target */
+        font-size: 0.875rem;
+    }
 }
 
 .toggleEducation:hover {

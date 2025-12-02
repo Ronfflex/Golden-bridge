@@ -16,6 +16,25 @@
     font-weight: 500;
     cursor: pointer;
     transition: all 0.2s ease;
+    min-height: 44px;
+    /* Touch target size */
+}
+
+/* Mobile adjustments for NetworkSwitcher */
+@media (max-width: 640px) {
+    .button {
+        padding: 10px 16px;
+        /* Slightly larger touch target */
+        font-size: 14px;
+    }
+
+    .dropdown {
+        right: auto;
+        left: 0;
+        /* Align dropdown to left on mobile */
+        min-width: 200px;
+        /* Slightly wider on mobile */
+    }
 }
 
 .button:hover {
