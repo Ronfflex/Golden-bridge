@@ -104,8 +104,15 @@ contract LotterieTest is Test {
     }
 
     function test_randomDrawBefore1DayWaiting() public {
+        uint256 lastDraw = block.timestamp - 1 days;
+        uint256 cooldown = 1 days;
+
         vm.warp(block.timestamp - 1 hours);
-        vm.expectRevert(ILotterie.DrawCooldownNotExpired.selector);
+        uint256 currentTime = block.timestamp;
+
+        vm.expectRevert(
+            abi.encodeWithSelector(ILotterie.DrawCooldownNotExpired.selector, lastDraw, cooldown, currentTime)
+        );
         lotterie.randomDraw();
     }
 

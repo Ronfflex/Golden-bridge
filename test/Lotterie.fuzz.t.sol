@@ -159,7 +159,14 @@ contract LotterieFuzzTest is Test {
         vm.warp(block.timestamp + timeElapsed);
 
         if (timeElapsed < 1 days) {
-            vm.expectRevert(ILotterie.DrawCooldownNotExpired.selector);
+            vm.expectRevert(
+                abi.encodeWithSelector(
+                    ILotterie.DrawCooldownNotExpired.selector,
+                    block.timestamp - timeElapsed,
+                    1 days,
+                    block.timestamp
+                )
+            );
             lotterie.randomDraw();
         } else {
             uint256 requestId = lotterie.randomDraw();
