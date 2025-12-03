@@ -38,6 +38,9 @@ contract Lotterie is
     /// @notice Key hash identifying the VRF proving key used for draws
     bytes32 internal _vrfKeyHash;
 
+    /// @notice Whether the payment in native tokens is enabled for the VRF subscription
+    bool internal _vrfNativePayment;
+
     /// @notice Gas limit allocated to `fulfillRandomWords`
     uint32 internal _callbackGasLimit;
 
@@ -47,11 +50,14 @@ contract Lotterie is
     /// @notice Amount of random words requested per draw
     uint32 internal _numWords;
 
+    /// @notice randomDrawCooldown amount of time required between draws
+    uint256 internal _randomDrawCooldown;
+
+    /// @notice Timestamp of the most recent draw, used to enforce the cooldown period
+    uint256 internal _lastRandomDraw;
+
     /// @notice GoldToken proxy feeding participant balances and payouts
     IGoldToken internal _goldToken;
-
-    /// @notice Timestamp of the most recent draw, used to enforce the daily cadence
-    uint256 internal _lastRandomDraw;
 
     /// @notice Historical record of VRF request identifiers
     uint256[] internal _requestIds;
@@ -78,10 +84,12 @@ contract Lotterie is
         address owner,
         uint256 vrfSubscriptionId,
         address vrfCoordinator,
+        bool vrfNativePayment,
         bytes32 keyHash,
         uint32 callbackGasLimit,
         uint16 requestConfirmations,
         uint32 numWords,
+        uint256 randomDrawCooldown,
         address goldToken
     ) external override initializer {
         __AccessControl_init();
@@ -93,10 +101,11 @@ contract Lotterie is
         _vrfSubscriptionId = vrfSubscriptionId;
         s_vrfCoordinator = IVRFCoordinatorV2Plus(vrfCoordinator);
         _vrfKeyHash = keyHash;
+        _vrfNativePayment = vrfNativePayment;
         _callbackGasLimit = callbackGasLimit;
         _requestConfirmations = requestConfirmations;
         _numWords = numWords;
-
+        _randomDrawCooldown = randomDrawCooldown;
         _lastRandomDraw = block.timestamp - 1 days;
         _goldToken = IGoldToken(goldToken);
 
@@ -105,10 +114,12 @@ contract Lotterie is
             vrfCoordinator,
             goldToken,
             vrfSubscriptionId,
+            vrfNativePayment,
             keyHash,
             callbackGasLimit,
             requestConfirmations,
-            numWords
+            numWords,
+            randomDrawCooldown
         );
     }
 
@@ -187,8 +198,8 @@ contract Lotterie is
 
     /// @inheritdoc ILotterie
     function randomDraw() external override onlyRole(OWNER_ROLE) returns (uint256) {
-        if (_lastRandomDraw + 1 days > block.timestamp) {
-            revert OneRandomDrawPerDay();
+        if (_lastRandomDraw + _randomDrawCooldown > block.timestamp) {
+            revert DrawCooldownNotExpired(_lastRandomDraw, _randomDrawCooldown, block.timestamp);
         }
 
         uint256 requestId = s_vrfCoordinator.requestRandomWords(
@@ -198,8 +209,7 @@ contract Lotterie is
                 requestConfirmations: _requestConfirmations,
                 callbackGasLimit: _callbackGasLimit,
                 numWords: _numWords,
-                // Set nativePayment to true to pay for VRF requests with Sepolia ETH instead of LINK
-                extraArgs: VRFV2PlusClient._argsToBytes(VRFV2PlusClient.ExtraArgsV1({nativePayment: false}))
+                extraArgs: VRFV2PlusClient._argsToBytes(VRFV2PlusClient.ExtraArgsV1({nativePayment: _vrfNativePayment}))
             })
         );
 

@@ -72,6 +72,7 @@ contract DeployCoreContracts is Script {
     uint32 constant CALLBACK_GAS_LIMIT = 100000;
     uint16 constant REQUEST_CONFIRMATIONS = 3;
     uint32 constant NUM_WORDS = 1;
+    bool constant VRF_NATIVE_PAYMENT = false;
 
     function run() external {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");

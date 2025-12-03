@@ -25,10 +25,12 @@ contract LotterieTest is Test {
         address indexed vrfCoordinator,
         address indexed goldToken,
         uint256 vrfSubscriptionId,
+        bool vrfNativePayment,
         bytes32 keyHash,
         uint32 callbackGasLimit,
         uint16 requestConfirmations,
-        uint32 numWords
+        uint32 numWords,
+        uint256 randomDrawCooldown
     );
     event VrfSubscriptionUpdated(uint256 indexed previousSubscriptionId, uint256 indexed newSubscriptionId);
     event VrfCoordinatorUpdated(address indexed previousCoordinator, address indexed newCoordinator);
@@ -68,10 +70,12 @@ contract LotterieTest is Test {
                 address(this),
                 subscription,
                 address(vrfCoordinator),
+                false,
                 bytes32(0x787d74caea10b2b357790d5b5247c2f63d1d91572a9846f780606e4d953677ae),
                 100000,
                 3,
                 1,
+                86400,
                 address(goldToken)
             )
         );
@@ -101,7 +105,7 @@ contract LotterieTest is Test {
 
     function test_randomDrawBefore1DayWaiting() public {
         vm.warp(block.timestamp - 1 hours);
-        vm.expectRevert(ILotterie.OneRandomDrawPerDay.selector);
+        vm.expectRevert(ILotterie.DrawCooldownNotExpired.selector);
         lotterie.randomDraw();
     }
 
@@ -249,10 +253,12 @@ contract LotterieTest is Test {
             address(vrfCoordinator),
             address(goldToken),
             subscription,
+            true,
             bytes32(uint256(0x1111)),
             50_000,
             2,
-            1
+            1,
+            86400
         );
         new ERC1967Proxy(
             address(implementation),
@@ -261,10 +267,12 @@ contract LotterieTest is Test {
                 address(this),
                 subscription,
                 address(vrfCoordinator),
+                true,
                 bytes32(uint256(0x1111)),
                 50_000,
                 2,
                 1,
+                86400,
                 address(goldToken)
             )
         );

@@ -43,10 +43,12 @@ contract LotterieFuzzTest is Test {
                 address(this),
                 vrfSubscriptionId,
                 address(vrfCoordinator),
+                false,
                 bytes32(0x787d74caea10b2b357790d5b5247c2f63d1d91572a9846f780606e4d953677ae),
                 100000,
                 3,
                 1,
+                86400,
                 address(goldToken)
             )
         );
@@ -157,7 +159,7 @@ contract LotterieFuzzTest is Test {
         vm.warp(block.timestamp + timeElapsed);
 
         if (timeElapsed < 1 days) {
-            vm.expectRevert(ILotterie.OneRandomDrawPerDay.selector);
+            vm.expectRevert(ILotterie.DrawCooldownNotExpired.selector);
             lotterie.randomDraw();
         } else {
             uint256 requestId = lotterie.randomDraw();
