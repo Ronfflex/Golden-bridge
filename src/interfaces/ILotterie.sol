@@ -98,6 +98,20 @@ interface ILotterie {
     event GoldTokenUpdated(address indexed previousGoldToken, address indexed newGoldToken);
 
     /**
+     * @notice Emitted when the random draw cooldown changes
+     * @param previousCooldown Cooldown before the update
+     * @param newCooldown Cooldown after the update
+     */
+    event RandomDrawCooldownUpdated(uint256 indexed previousCooldown, uint256 indexed newCooldown);
+
+    /**
+     * @notice Emitted when the VRF native payment setting changes
+     * @param previousNativePayment Setting before the update
+     * @param newNativePayment Setting after the update
+     */
+    event VrfNativePaymentUpdated(bool indexed previousNativePayment, bool indexed newNativePayment);
+
+    /**
      * @notice Emitted when a participant successfully claims lottery gains
      * @param account Winner address claiming their gains
      * @param amount Amount of GLD transferred to the winner
@@ -173,6 +187,18 @@ interface ILotterie {
      * @param goldToken Address of the GoldToken proxy
      */
     function setGoldToken(address goldToken) external;
+
+    /**
+     * @notice Updates the minimum time required between lottery draws
+     * @param randomDrawCooldown New cooldown period
+     */
+    function setRandomDrawCooldown(uint256 randomDrawCooldown) external;
+
+    /**
+     * @notice Updates the VRF native payment setting
+     * @param vrfNativePayment New native payment setting
+     */
+    function setVrfNativePayment(bool vrfNativePayment) external;
 
     /*//////////////////////////////////////////////////////////////
                               CORE FUNCTIONS
@@ -279,4 +305,16 @@ interface ILotterie {
      * @return Subscription id
      */
     function getVrfSubscriptionId() external view returns (uint256);
+
+    /**
+     * @notice Returns the minimum time required between lottery draws
+     * @return Cooldown period
+     */
+    function getRandomDrawCooldown() external view returns (uint256);
+
+    /**
+     * @notice Returns whether the VRF subscription uses native payment
+     * @return True if native payment is enabled
+     */
+    function getVrfNativePayment() external view returns (bool);
 }

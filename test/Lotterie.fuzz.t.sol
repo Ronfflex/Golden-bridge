@@ -147,31 +147,38 @@ contract LotterieFuzzTest is Test {
     }
 
     /// @notice Fuzz test time constraints between draws
-    function testFuzz_randomDraw_timeConstraints(uint32 timeElapsed) public {
-        vm.assume(timeElapsed < 2 days);
+    function testFuzz_randomDraw_timeConstraints(uint32 timeElapsed, uint32 cooldown) public {
+        vm.assume(cooldown > 1 hours);
+        vm.assume(cooldown < 365 days);
+        vm.assume(timeElapsed < cooldown * 2);
+
+        lotterie.setRandomDrawCooldown(cooldown);
 
         vm.deal(address(this), 1 ether);
         goldToken.mint{value: 1 ether}();
 
-        vm.warp(block.timestamp + 1 days);
+        vm.warp(block.timestamp + cooldown);
         lotterie.randomDraw();
 
         vm.warp(block.timestamp + timeElapsed);
 
-        if (timeElapsed < 1 days) {
+        if (timeElapsed < cooldown) {
             vm.expectRevert(
                 abi.encodeWithSelector(
-                    ILotterie.DrawCooldownNotExpired.selector,
-                    block.timestamp - timeElapsed,
-                    1 days,
-                    block.timestamp
+                    ILotterie.DrawCooldownNotExpired.selector, block.timestamp - timeElapsed, cooldown, block.timestamp
                 )
             );
             lotterie.randomDraw();
         } else {
             uint256 requestId = lotterie.randomDraw();
-            assertGt(requestId, 0, "Should succeed after 1 day");
+            assertGt(requestId, 0, "Should succeed after cooldown");
         }
+    }
+
+    /// @notice Fuzz test VRF native payment setting
+    function testFuzz_setVrfNativePayment(bool useNative) public {
+        lotterie.setVrfNativePayment(useNative);
+        assertEq(lotterie.getVrfNativePayment(), useNative, "Native payment setting should update");
     }
 
     /// @notice Fuzz test VRF subscription ID changes

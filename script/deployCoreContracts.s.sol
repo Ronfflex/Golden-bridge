@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {Script, console2} from "forge-std/src/Script.sol";
+import {Script, console2} from "forge-std/Script.sol";
 import {GoldToken} from "../src/GoldToken.sol";
 import {Lotterie} from "../src/Lotterie.sol";
 import {TokenBridge} from "../src/TokenBridge.sol";
@@ -73,6 +73,7 @@ contract DeployCoreContracts is Script {
     uint16 constant REQUEST_CONFIRMATIONS = 3;
     uint32 constant NUM_WORDS = 1;
     bool constant VRF_NATIVE_PAYMENT = false;
+    uint32 constant RANDOM_DRAW_COOLDOWN = 5 minutes; // low cooldown set for testing purposes
 
     function run() external {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
@@ -112,10 +113,12 @@ contract DeployCoreContracts is Script {
             deployer,
             config.vrfSubscriptionId,
             config.vrfCoordinator,
+            VRF_NATIVE_PAYMENT,
             config.keyHash,
             CALLBACK_GAS_LIMIT,
             REQUEST_CONFIRMATIONS,
             NUM_WORDS,
+            RANDOM_DRAW_COOLDOWN,
             address(goldToken)
         );
         ERC1967Proxy lotterieProxy = new ERC1967Proxy(address(lotterieImpl), lotterieData);

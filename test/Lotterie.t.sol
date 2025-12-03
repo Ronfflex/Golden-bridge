@@ -39,6 +39,8 @@ contract LotterieTest is Test {
     event RequestConfirmationsUpdated(uint16 indexed previousConfirmations, uint16 indexed newConfirmations);
     event NumWordsUpdated(uint32 indexed previousNumWords, uint32 indexed newNumWords);
     event GoldTokenUpdated(address indexed previousGoldToken, address indexed newGoldToken);
+    event RandomDrawCooldownUpdated(uint256 indexed previousCooldown, uint256 indexed newCooldown);
+    event VrfNativePaymentUpdated(bool indexed previousNativePayment, bool indexed newNativePayment);
     event GainClaimed(address indexed account, uint256 amount);
 
     function setUp() public {
@@ -249,6 +251,20 @@ contract LotterieTest is Test {
         lotterie.setGoldToken(address(0x1));
         address goldTokenAddress = lotterie.getGoldToken();
         assertEq(goldTokenAddress, address(0x1), "goldToken should be 0x1");
+    }
+
+    function test_setRandomDrawCooldown() public {
+        vm.expectEmit(true, true, false, false, address(lotterie));
+        emit RandomDrawCooldownUpdated(lotterie.getRandomDrawCooldown(), 1 days + 1);
+        lotterie.setRandomDrawCooldown(1 days + 1);
+        assertEq(lotterie.getRandomDrawCooldown(), 1 days + 1, "cooldown should be updated");
+    }
+
+    function test_setVrfNativePayment() public {
+        vm.expectEmit(true, true, false, false, address(lotterie));
+        emit VrfNativePaymentUpdated(lotterie.getVrfNativePayment(), true);
+        lotterie.setVrfNativePayment(true);
+        assertTrue(lotterie.getVrfNativePayment(), "native payment should be true");
     }
 
     function test_initialize_emits_event() public {

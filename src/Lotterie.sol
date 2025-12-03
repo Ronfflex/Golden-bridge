@@ -192,6 +192,20 @@ contract Lotterie is
         emit GoldTokenUpdated(previous, goldToken);
     }
 
+    /// @inheritdoc ILotterie
+    function setRandomDrawCooldown(uint256 randomDrawCooldown) external override onlyRole(OWNER_ROLE) {
+        uint256 previous = _randomDrawCooldown;
+        _randomDrawCooldown = randomDrawCooldown;
+        emit RandomDrawCooldownUpdated(previous, randomDrawCooldown);
+    }
+
+    /// @inheritdoc ILotterie
+    function setVrfNativePayment(bool vrfNativePayment) external override onlyRole(OWNER_ROLE) {
+        bool previous = _vrfNativePayment;
+        _vrfNativePayment = vrfNativePayment;
+        emit VrfNativePaymentUpdated(previous, vrfNativePayment);
+    }
+
     /*//////////////////////////////////////////////////////////////
                             CORE FUNCTIONS
     //////////////////////////////////////////////////////////////*/
@@ -300,5 +314,15 @@ contract Lotterie is
     /// @inheritdoc ILotterie
     function getVrfSubscriptionId() external view override returns (uint256) {
         return _vrfSubscriptionId;
+    }
+
+    /// @inheritdoc ILotterie
+    function getRandomDrawCooldown() external view override returns (uint256) {
+        return _randomDrawCooldown;
+    }
+
+    /// @inheritdoc ILotterie
+    function getVrfNativePayment() external view override returns (bool) {
+        return _vrfNativePayment;
     }
 }
