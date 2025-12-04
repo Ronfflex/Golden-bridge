@@ -37,27 +37,6 @@ contract TokenBridgeTest is Test {
     MockV3Aggregator public goldAggregator;
     MockV3Aggregator public ethAggregator;
 
-    event TokenBridgeInitialized(
-        address indexed owner, address indexed link, address indexed goldToken, uint64 destinationChainSelector
-    );
-    event MessageProcessedWithoutToken(bytes32 indexed messageId, uint64 indexed sourceChainSelector);
-    event TokensBridged(
-        bytes32 indexed messageId,
-        address indexed sender,
-        address indexed receiver,
-        uint256 amount,
-        uint64 destinationChainSelector,
-        address feeToken,
-        uint256 fees
-    );
-    event TokensReceived(
-        bytes32 indexed messageId, address indexed receiver, uint256 amount, uint64 indexed sourceChainSelector
-    );
-    event ChainWhitelisted(uint64 indexed chainSelector);
-    event ChainRemoved(uint64 indexed chainSelector);
-    event SenderWhitelisted(address indexed sender);
-    event SenderRemoved(address indexed sender);
-
     function setUp() public {
         // Setup accounts
         owner = address(this);
@@ -152,7 +131,7 @@ contract TokenBridgeTest is Test {
     function test_initialize_emits_event() public {
         TokenBridge implementation = new TokenBridge(address(router));
         vm.expectEmit(true, true, true, true);
-        emit TokenBridgeInitialized(owner, address(linkToken), address(goldToken), BSC_CHAIN_SELECTOR);
+        emit ITokenBridge.TokenBridgeInitialized(owner, address(linkToken), address(goldToken), BSC_CHAIN_SELECTOR);
         new ERC1967Proxy(
             address(implementation),
             abi.encodeWithSelector(
@@ -452,7 +431,7 @@ contract TokenBridgeTest is Test {
         });
 
         vm.expectEmit(true, true, false, false, address(tokenBridge));
-        emit MessageProcessedWithoutToken(message.messageId, BSC_CHAIN_SELECTOR);
+        emit ITokenBridge.MessageProcessedWithoutToken(message.messageId, BSC_CHAIN_SELECTOR);
         vm.prank(address(router));
         tokenBridge.ccipReceive(message);
 
@@ -585,12 +564,12 @@ contract TokenBridgeTest is Test {
             Client._argsToBytes(Client.EVMExtraArgsV2({gasLimit: 300_000, allowOutOfOrderExecution: true}));
 
         vm.expectEmit(false, false, false, true, address(tokenBridge));
-        emit ChainWhitelisted(newChain);
+        emit ITokenBridge.ChainWhitelisted(newChain);
         tokenBridge.setWhitelistedChain(newChain, true, args);
         assertTrue(tokenBridge.whitelistedChains(newChain));
 
         vm.expectEmit(false, false, false, true, address(tokenBridge));
-        emit ChainRemoved(newChain);
+        emit ITokenBridge.ChainRemoved(newChain);
         tokenBridge.setWhitelistedChain(newChain, false, "");
         assertFalse(tokenBridge.whitelistedChains(newChain));
     }
@@ -599,12 +578,12 @@ contract TokenBridgeTest is Test {
         address newSender = signers[0];
 
         vm.expectEmit(false, false, false, true, address(tokenBridge));
-        emit SenderWhitelisted(newSender);
+        emit ITokenBridge.SenderWhitelisted(newSender);
         tokenBridge.setWhitelistedSender(newSender, true);
         assertTrue(tokenBridge.whitelistedSenders(newSender));
 
         vm.expectEmit(false, false, false, true, address(tokenBridge));
-        emit SenderRemoved(newSender);
+        emit ITokenBridge.SenderRemoved(newSender);
         tokenBridge.setWhitelistedSender(newSender, false);
         assertFalse(tokenBridge.whitelistedSenders(newSender));
     }
