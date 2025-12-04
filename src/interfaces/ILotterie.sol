@@ -8,8 +8,39 @@ pragma solidity 0.8.28;
  */
 interface ILotterie {
     /*//////////////////////////////////////////////////////////////
+                                STRUCTS
+    //////////////////////////////////////////////////////////////*/
+
+    /**
+     * @notice Configuration struct used during Lotterie initialization
+     * @param owner Address granted OWNER_ROLE
+     * @param vrfSubscriptionId Subscription id funding VRF requests
+     * @param vrfCoordinator Address of the VRF coordinator
+     * @param vrfNativePayment True when the VRF subscription uses native payment
+     * @param keyHash Chainlink VRF key hash used for randomness
+     * @param callbackGasLimit Gas limit allocated for fulfillRandomWords
+     * @param requestConfirmations Number of confirmations required for VRF responses
+     * @param numWords Number of random words requested per draw
+     * @param randomDrawCooldown Minimum time between draws
+     * @param goldToken Address of the GoldToken proxy
+     */
+    struct LotterieConfig {
+        address owner;
+        uint256 vrfSubscriptionId;
+        address vrfCoordinator;
+        bool vrfNativePayment;
+        bytes32 keyHash;
+        uint32 callbackGasLimit;
+        uint16 requestConfirmations;
+        uint32 numWords;
+        uint256 randomDrawCooldown;
+        address goldToken;
+    }
+
+    /*//////////////////////////////////////////////////////////////
                                  EVENTS
     //////////////////////////////////////////////////////////////*/
+
     /**
      * @notice Emitted whenever a VRF request for randomness is sent
      * @param requestId Unique identifier for the Chainlink VRF request
@@ -121,6 +152,7 @@ interface ILotterie {
     /*//////////////////////////////////////////////////////////////
                                  ERRORS
     //////////////////////////////////////////////////////////////*/
+
     /**
      * @notice Reverts when attempting to draw more than once within the cooldown period
      * @param lastDraw Timestamp of the last draw
@@ -138,6 +170,7 @@ interface ILotterie {
     /*//////////////////////////////////////////////////////////////
                              ADMIN FUNCTIONS
     //////////////////////////////////////////////////////////////*/
+
     /// @notice Grants OWNER_ROLE to a new account
     /// @param account Address receiving OWNER_ROLE
     function addOwner(address account) external;
@@ -203,31 +236,9 @@ interface ILotterie {
     /*//////////////////////////////////////////////////////////////
                               CORE FUNCTIONS
     //////////////////////////////////////////////////////////////*/
-    /**
-     * @notice Initializes the proxy with VRF configuration and GoldToken reference
-     * @param owner Address granted OWNER_ROLE
-     * @param vrfSubscriptionId Subscription id funding VRF requests
-     * @param vrfCoordinator Address of the VRF coordinator
-     * @param vrfNativePayment True when the VRF subscription uses native payment
-     * @param keyHash Chainlink VRF key hash used for randomness
-     * @param callbackGasLimit Gas limit allocated for fulfillRandomWords
-     * @param requestConfirmations Number of confirmations required for VRF responses
-     * @param numWords Number of random words requested per draw
-     * @param randomDrawCooldown Minimum time between draws
-     * @param goldToken Address of the GoldToken proxy
-     */
-    function initialize(
-        address owner,
-        uint256 vrfSubscriptionId,
-        address vrfCoordinator,
-        bool vrfNativePayment,
-        bytes32 keyHash,
-        uint32 callbackGasLimit,
-        uint16 requestConfirmations,
-        uint32 numWords,
-        uint256 randomDrawCooldown,
-        address goldToken
-    ) external;
+
+    /// @notice Initializes the proxy with VRF configuration and GoldToken reference
+    function initialize(LotterieConfig calldata config) external;
 
     /**
      * @notice Requests randomness from Chainlink to pick a lottery winner

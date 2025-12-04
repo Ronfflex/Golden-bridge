@@ -4,6 +4,7 @@ pragma solidity 0.8.28;
 import {Script, console2} from "forge-std/Script.sol";
 import {GoldToken} from "../src/GoldToken.sol";
 import {Lotterie} from "../src/Lotterie.sol";
+import {ILotterie} from "../src/interfaces/ILotterie.sol";
 import {TokenBridge} from "../src/TokenBridge.sol";
 import {ApprovalProcessResponse, Defender} from "openzeppelin-foundry-upgrades/Defender.sol";
 import {Options, Upgrades} from "openzeppelin-foundry-upgrades/Upgrades.sol";
@@ -82,18 +83,18 @@ contract DeployCoreContractsWithDefender is Script {
             "src/Lotterie.sol",
             abi.encodeCall(
                 Lotterie.initialize,
-                (
-                    owner,
-                    config.vrfSubscriptionId,
-                    config.vrfCoordinator,
-                    VRF_NATIVE_PAYMENT,
-                    config.keyHash,
-                    CALLBACK_GAS_LIMIT,
-                    REQUEST_CONFIRMATIONS,
-                    NUM_WORDS,
-                    RANDOM_DRAW_COOLDOWN,
-                    goldTokenProxy
-                )
+                (ILotterie.LotterieConfig({
+                        owner: owner,
+                        vrfSubscriptionId: config.vrfSubscriptionId,
+                        vrfCoordinator: config.vrfCoordinator,
+                        vrfNativePayment: VRF_NATIVE_PAYMENT,
+                        keyHash: config.keyHash,
+                        callbackGasLimit: CALLBACK_GAS_LIMIT,
+                        requestConfirmations: REQUEST_CONFIRMATIONS,
+                        numWords: NUM_WORDS,
+                        randomDrawCooldown: RANDOM_DRAW_COOLDOWN,
+                        goldToken: goldTokenProxy
+                    }))
             ),
             lotterieOpts
         );

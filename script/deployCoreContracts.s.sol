@@ -4,6 +4,7 @@ pragma solidity 0.8.28;
 import {Script, console2} from "forge-std/Script.sol";
 import {GoldToken} from "../src/GoldToken.sol";
 import {Lotterie} from "../src/Lotterie.sol";
+import {ILotterie} from "../src/interfaces/ILotterie.sol";
 import {TokenBridge} from "../src/TokenBridge.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
@@ -110,16 +111,18 @@ contract DeployCoreContracts is Script {
 
         bytes memory lotterieData = abi.encodeWithSelector(
             Lotterie.initialize.selector,
-            deployer,
-            config.vrfSubscriptionId,
-            config.vrfCoordinator,
-            VRF_NATIVE_PAYMENT,
-            config.keyHash,
-            CALLBACK_GAS_LIMIT,
-            REQUEST_CONFIRMATIONS,
-            NUM_WORDS,
-            RANDOM_DRAW_COOLDOWN,
-            address(goldToken)
+            ILotterie.LotterieConfig({
+                owner: deployer,
+                vrfSubscriptionId: config.vrfSubscriptionId,
+                vrfCoordinator: config.vrfCoordinator,
+                vrfNativePayment: VRF_NATIVE_PAYMENT,
+                keyHash: config.keyHash,
+                callbackGasLimit: CALLBACK_GAS_LIMIT,
+                requestConfirmations: REQUEST_CONFIRMATIONS,
+                numWords: NUM_WORDS,
+                randomDrawCooldown: RANDOM_DRAW_COOLDOWN,
+                goldToken: address(goldToken)
+            })
         );
         ERC1967Proxy lotterieProxy = new ERC1967Proxy(address(lotterieImpl), lotterieData);
         Lotterie lotterie = Lotterie(address(lotterieProxy));

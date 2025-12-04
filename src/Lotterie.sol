@@ -80,46 +80,35 @@ contract Lotterie is
     }
 
     /// @inheritdoc ILotterie
-    function initialize(
-        address owner,
-        uint256 vrfSubscriptionId,
-        address vrfCoordinator,
-        bool vrfNativePayment,
-        bytes32 keyHash,
-        uint32 callbackGasLimit,
-        uint16 requestConfirmations,
-        uint32 numWords,
-        uint256 randomDrawCooldown,
-        address goldToken
-    ) external override initializer {
+    function initialize(LotterieConfig calldata config) external override initializer {
         __AccessControl_init();
 
-        _grantRole(OWNER_ROLE, owner);
+        _grantRole(OWNER_ROLE, config.owner);
 
         _setRoleAdmin(OWNER_ROLE, OWNER_ROLE);
 
-        _vrfSubscriptionId = vrfSubscriptionId;
-        s_vrfCoordinator = IVRFCoordinatorV2Plus(vrfCoordinator);
-        _vrfKeyHash = keyHash;
-        _vrfNativePayment = vrfNativePayment;
-        _callbackGasLimit = callbackGasLimit;
-        _requestConfirmations = requestConfirmations;
-        _numWords = numWords;
-        _randomDrawCooldown = randomDrawCooldown;
+        _vrfSubscriptionId = config.vrfSubscriptionId;
+        s_vrfCoordinator = IVRFCoordinatorV2Plus(config.vrfCoordinator);
+        _vrfKeyHash = config.keyHash;
+        _vrfNativePayment = config.vrfNativePayment;
+        _callbackGasLimit = config.callbackGasLimit;
+        _requestConfirmations = config.requestConfirmations;
+        _numWords = config.numWords;
+        _randomDrawCooldown = config.randomDrawCooldown;
         _lastRandomDraw = block.timestamp - 1 days;
-        _goldToken = IGoldToken(goldToken);
+        _goldToken = IGoldToken(config.goldToken);
 
         emit LotterieInitialized(
-            owner,
-            vrfCoordinator,
-            goldToken,
-            vrfSubscriptionId,
-            vrfNativePayment,
-            keyHash,
-            callbackGasLimit,
-            requestConfirmations,
-            numWords,
-            randomDrawCooldown
+            config.owner,
+            config.vrfCoordinator,
+            config.goldToken,
+            config.vrfSubscriptionId,
+            config.vrfNativePayment,
+            config.keyHash,
+            config.callbackGasLimit,
+            config.requestConfirmations,
+            config.numWords,
+            config.randomDrawCooldown
         );
     }
 
