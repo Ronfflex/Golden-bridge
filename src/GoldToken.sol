@@ -261,6 +261,16 @@ contract GoldToken is
     }
 
     /// @inheritdoc IGoldToken
+    function getUserByIndex(uint256 index) external view override returns (address) {
+        return _users[index];
+    }
+
+    /// @inheritdoc IGoldToken
+    function getUserCount() external view override returns (uint256) {
+        return _users.length;
+    }
+
+    /// @inheritdoc IGoldToken
     function getTimestamps() external view override returns (address[] memory, uint256[] memory) {
         uint256 length = _users.length;
         uint256[] memory timestamps = new uint256[](length);

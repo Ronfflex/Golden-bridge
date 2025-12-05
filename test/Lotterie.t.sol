@@ -49,12 +49,11 @@ contract LotterieTest is Test {
                 address(this),
                 subscription,
                 address(vrfCoordinator),
-                false,
                 bytes32(0x787d74caea10b2b357790d5b5247c2f63d1d91572a9846f780606e4d953677ae),
-                100000,
+                40_000,
                 3,
                 1,
-                86400,
+                86_400, // One day
                 address(goldToken)
             )
         );
@@ -92,13 +91,13 @@ contract LotterieTest is Test {
         vm.expectRevert(
             abi.encodeWithSelector(ILotterie.DrawCooldownNotExpired.selector, lastDraw, cooldown, currentTime)
         );
-        lotterie.randomDraw();
+        lotterie.randomDraw(false);
     }
 
     function test_randomDraw() public {
         vm.warp(block.timestamp + 1 days);
         vm.recordLogs();
-        uint256 requestId = lotterie.randomDraw();
+        uint256 requestId = lotterie.randomDraw(false);
 
         Vm.Log[] memory logs = vm.getRecordedLogs();
         (Vm.Log memory randomDrawLog, bool found) = _findLog(logs, keccak256("RandomDrawed(uint256)"));
@@ -111,7 +110,7 @@ contract LotterieTest is Test {
     function test_randomDrawFulfillmentAndClaimFlow() public {
         vm.warp(block.timestamp + 1 days);
         goldToken.mint{value: 1 ether}();
-        uint256 requestId = lotterie.randomDraw();
+        uint256 requestId = lotterie.randomDraw(false);
 
         assertEq(lotterie.getLastRequestId(), requestId, "last request id should match the recent draw");
 
@@ -151,7 +150,7 @@ contract LotterieTest is Test {
     function test_claim_reverts_when_transfer_fails() public {
         vm.warp(block.timestamp + 1 days);
         goldToken.mint{value: 1 ether}();
-        uint256 requestId = lotterie.randomDraw();
+        uint256 requestId = lotterie.randomDraw(false);
         vrfCoordinator.fulfillRandomWords(requestId, address(lotterie));
 
         address winner = lotterie.getResults(requestId);
@@ -237,13 +236,6 @@ contract LotterieTest is Test {
         assertEq(lotterie.getRandomDrawCooldown(), 1 days + 1, "cooldown should be updated");
     }
 
-    function test_setVrfNativePayment() public {
-        vm.expectEmit(true, true, false, false, address(lotterie));
-        emit ILotterie.VrfNativePaymentUpdated(lotterie.getVrfNativePayment(), true);
-        lotterie.setVrfNativePayment(true);
-        assertTrue(lotterie.getVrfNativePayment(), "native payment should be true");
-    }
-
     function test_initialize_emits_event() public {
         Lotterie implementation = new Lotterie(address(vrfCoordinator));
         uint256 subscription = vrfCoordinator.createSubscription();
@@ -253,7 +245,6 @@ contract LotterieTest is Test {
             address(vrfCoordinator),
             address(goldToken),
             subscription,
-            true,
             bytes32(uint256(0x1111)),
             50_000,
             2,
@@ -267,7 +258,6 @@ contract LotterieTest is Test {
                 address(this),
                 subscription,
                 address(vrfCoordinator),
-                true,
                 bytes32(uint256(0x1111)),
                 50_000,
                 2,

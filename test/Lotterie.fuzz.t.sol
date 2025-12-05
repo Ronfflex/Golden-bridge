@@ -43,12 +43,11 @@ contract LotterieFuzzTest is Test {
                 address(this),
                 vrfSubscriptionId,
                 address(vrfCoordinator),
-                false,
                 bytes32(0x787d74caea10b2b357790d5b5247c2f63d1d91572a9846f780606e4d953677ae),
-                100000,
+                40_000,
                 3,
                 1,
-                86400,
+                86_400, // One day
                 address(goldToken)
             )
         );
@@ -98,7 +97,7 @@ contract LotterieFuzzTest is Test {
 
         vm.warp(block.timestamp + 1 days);
 
-        uint256 requestId = lotterie.randomDraw();
+        uint256 requestId = lotterie.randomDraw(false);
         assertGt(requestId, 0, "Request ID should be positive");
 
         // Fulfill the randomness
@@ -131,7 +130,7 @@ contract LotterieFuzzTest is Test {
 
         vm.warp(block.timestamp + 1 days);
 
-        uint256 requestId = lotterie.randomDraw();
+        uint256 requestId = lotterie.randomDraw(false);
         vrfCoordinator.fulfillRandomWords(requestId, address(lotterie));
 
         address winner = lotterie.getResults(requestId);
@@ -158,7 +157,7 @@ contract LotterieFuzzTest is Test {
         goldToken.mint{value: 1 ether}();
 
         vm.warp(block.timestamp + cooldown);
-        lotterie.randomDraw();
+        lotterie.randomDraw(false);
 
         vm.warp(block.timestamp + timeElapsed);
 
@@ -168,17 +167,11 @@ contract LotterieFuzzTest is Test {
                     ILotterie.DrawCooldownNotExpired.selector, block.timestamp - timeElapsed, cooldown, block.timestamp
                 )
             );
-            lotterie.randomDraw();
+            lotterie.randomDraw(false);
         } else {
-            uint256 requestId = lotterie.randomDraw();
+            uint256 requestId = lotterie.randomDraw(false);
             assertGt(requestId, 0, "Should succeed after cooldown");
         }
-    }
-
-    /// @notice Fuzz test VRF native payment setting
-    function testFuzz_setVrfNativePayment(bool useNative) public {
-        lotterie.setVrfNativePayment(useNative);
-        assertEq(lotterie.getVrfNativePayment(), useNative, "Native payment setting should update");
     }
 
     /// @notice Fuzz test VRF subscription ID changes
@@ -202,7 +195,7 @@ contract LotterieFuzzTest is Test {
         for (uint256 i = 0; i < drawCount; i++) {
             currentTime += 1 days + 1;
             vm.warp(currentTime);
-            uint256 requestId = lotterie.randomDraw();
+            uint256 requestId = lotterie.randomDraw(false);
             assertGt(requestId, 0, "Request ID should be positive");
 
             vrfCoordinator.fulfillRandomWords(requestId, address(lotterie));
@@ -231,7 +224,7 @@ contract LotterieFuzzTest is Test {
         }
 
         vm.warp(block.timestamp + 1 days);
-        uint256 requestId = lotterie.randomDraw();
+        uint256 requestId = lotterie.randomDraw(false);
         vrfCoordinator.fulfillRandomWords(requestId, address(lotterie));
 
         address winner = lotterie.getResults(requestId);
@@ -268,7 +261,7 @@ contract LotterieFuzzTest is Test {
         uint256 balanceBefore = goldToken.balanceOf(address(lotterie));
         vm.assume(balanceBefore > 0);
 
-        uint256 requestId = lotterie.randomDraw();
+        uint256 requestId = lotterie.randomDraw(false);
         vrfCoordinator.fulfillRandomWords(requestId, address(lotterie));
 
         address winner = lotterie.getResults(requestId);
@@ -303,7 +296,7 @@ contract LotterieFuzzTest is Test {
         newGoldToken.mint{value: mintAmount2}();
 
         vm.warp(block.timestamp + 1 days);
-        uint256 requestId = lotterie.randomDraw();
+        uint256 requestId = lotterie.randomDraw(false);
         vrfCoordinator.fulfillRandomWords(requestId, address(lotterie));
 
         address winner = lotterie.getResults(requestId);
@@ -314,7 +307,7 @@ contract LotterieFuzzTest is Test {
     /// @notice Documents that draws without users keep winner unset
     function test_randomDraw_withoutUsersLeavesWinnerUnset() public {
         vm.warp(block.timestamp + 1 days);
-        uint256 requestId = lotterie.randomDraw();
+        uint256 requestId = lotterie.randomDraw(false);
 
         vrfCoordinator.fulfillRandomWords(requestId, address(lotterie));
 

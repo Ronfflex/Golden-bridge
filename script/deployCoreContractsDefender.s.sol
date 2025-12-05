@@ -58,10 +58,9 @@ contract DeployCoreContractsWithDefender is Script {
         keyHash: 0x8596b430971ac45bdf6088665b9ad8e8630c9d5049ab54b14dff711bee7c0e26
     });
 
-    uint32 constant CALLBACK_GAS_LIMIT = 40000;
+    uint32 constant CALLBACK_GAS_LIMIT = 40_000;
     uint16 constant REQUEST_CONFIRMATIONS = 3;
     uint32 constant NUM_WORDS = 1;
-    bool constant VRF_NATIVE_PAYMENT = false;
     uint32 constant RANDOM_DRAW_COOLDOWN = 1 days;
 
     function run() external {
@@ -87,7 +86,6 @@ contract DeployCoreContractsWithDefender is Script {
                         owner: owner,
                         vrfSubscriptionId: config.vrfSubscriptionId,
                         vrfCoordinator: config.vrfCoordinator,
-                        vrfNativePayment: VRF_NATIVE_PAYMENT,
                         keyHash: config.keyHash,
                         callbackGasLimit: CALLBACK_GAS_LIMIT,
                         requestConfirmations: REQUEST_CONFIRMATIONS,

@@ -70,10 +70,9 @@ contract DeployCoreContracts is Script {
     });
 
     // Chainlink VRF parameters (same for both networks)
-    uint32 constant CALLBACK_GAS_LIMIT = 100000;
+    uint32 constant CALLBACK_GAS_LIMIT = 40_000;
     uint16 constant REQUEST_CONFIRMATIONS = 3;
     uint32 constant NUM_WORDS = 1;
-    bool constant VRF_NATIVE_PAYMENT = false;
     uint32 constant RANDOM_DRAW_COOLDOWN = 5 minutes; // low cooldown set for testing purposes
 
     function run() external {
@@ -115,7 +114,6 @@ contract DeployCoreContracts is Script {
                 owner: deployer,
                 vrfSubscriptionId: config.vrfSubscriptionId,
                 vrfCoordinator: config.vrfCoordinator,
-                vrfNativePayment: VRF_NATIVE_PAYMENT,
                 keyHash: config.keyHash,
                 callbackGasLimit: CALLBACK_GAS_LIMIT,
                 requestConfirmations: REQUEST_CONFIRMATIONS,

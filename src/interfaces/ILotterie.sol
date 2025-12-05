@@ -16,7 +16,6 @@ interface ILotterie {
      * @param owner Address granted OWNER_ROLE
      * @param vrfSubscriptionId Subscription id funding VRF requests
      * @param vrfCoordinator Address of the VRF coordinator
-     * @param vrfNativePayment True when the VRF subscription uses native payment
      * @param keyHash Chainlink VRF key hash used for randomness
      * @param callbackGasLimit Gas limit allocated for fulfillRandomWords
      * @param requestConfirmations Number of confirmations required for VRF responses
@@ -28,7 +27,6 @@ interface ILotterie {
         address owner;
         uint256 vrfSubscriptionId;
         address vrfCoordinator;
-        bool vrfNativePayment;
         bytes32 keyHash;
         uint32 callbackGasLimit;
         uint16 requestConfirmations;
@@ -59,7 +57,6 @@ interface ILotterie {
      * @param vrfCoordinator Chainlink VRF coordinator contract address
      * @param goldToken GoldToken proxy associated with the lottery
      * @param vrfSubscriptionId VRF subscription identifier configured for draws
-     * @param vrfNativePayment Whether the VRF subscription is configured for native payment
      * @param keyHash Chainlink VRF key hash used to request randomness
      * @param callbackGasLimit Gas limit allocated to fulfillRandomWords
      * @param requestConfirmations Number of confirmations required per VRF request
@@ -71,7 +68,6 @@ interface ILotterie {
         address indexed vrfCoordinator,
         address indexed goldToken,
         uint256 vrfSubscriptionId,
-        bool vrfNativePayment,
         bytes32 keyHash,
         uint32 callbackGasLimit,
         uint16 requestConfirmations,
@@ -134,13 +130,6 @@ interface ILotterie {
      * @param newCooldown Cooldown after the update
      */
     event RandomDrawCooldownUpdated(uint256 indexed previousCooldown, uint256 indexed newCooldown);
-
-    /**
-     * @notice Emitted when the VRF native payment setting changes
-     * @param previousNativePayment Setting before the update
-     * @param newNativePayment Setting after the update
-     */
-    event VrfNativePaymentUpdated(bool indexed previousNativePayment, bool indexed newNativePayment);
 
     /**
      * @notice Emitted when a participant successfully claims lottery gains
@@ -227,12 +216,6 @@ interface ILotterie {
      */
     function setRandomDrawCooldown(uint256 randomDrawCooldown) external;
 
-    /**
-     * @notice Updates the VRF native payment setting
-     * @param vrfNativePayment New native payment setting
-     */
-    function setVrfNativePayment(bool vrfNativePayment) external;
-
     /*//////////////////////////////////////////////////////////////
                               CORE FUNCTIONS
     //////////////////////////////////////////////////////////////*/
@@ -242,9 +225,10 @@ interface ILotterie {
 
     /**
      * @notice Requests randomness from Chainlink to pick a lottery winner
+     * @param enableNativePayment When true, the VRF request will be paid in native tokens otherwise LINK will be used
      * @return requestId Identifier of the VRF request
      */
-    function randomDraw() external returns (uint256 requestId);
+    function randomDraw(bool enableNativePayment) external returns (uint256 requestId);
 
     /// @notice Claims accrued lottery gains for the caller
     function claim() external;
@@ -322,10 +306,4 @@ interface ILotterie {
      * @return Cooldown period
      */
     function getRandomDrawCooldown() external view returns (uint256);
-
-    /**
-     * @notice Returns whether the VRF subscription uses native payment
-     * @return True if native payment is enabled
-     */
-    function getVrfNativePayment() external view returns (bool);
 }

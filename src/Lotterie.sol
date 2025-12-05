@@ -38,9 +38,6 @@ contract Lotterie is
     /// @notice Key hash identifying the VRF proving key used for draws
     bytes32 internal _vrfKeyHash;
 
-    /// @notice Whether the payment in native tokens is enabled for the VRF subscription
-    bool internal _vrfNativePayment;
-
     /// @notice Gas limit allocated to `fulfillRandomWords`
     uint32 internal _callbackGasLimit;
 
@@ -90,7 +87,6 @@ contract Lotterie is
         _vrfSubscriptionId = config.vrfSubscriptionId;
         s_vrfCoordinator = IVRFCoordinatorV2Plus(config.vrfCoordinator);
         _vrfKeyHash = config.keyHash;
-        _vrfNativePayment = config.vrfNativePayment;
         _callbackGasLimit = config.callbackGasLimit;
         _requestConfirmations = config.requestConfirmations;
         _numWords = config.numWords;
@@ -103,7 +99,6 @@ contract Lotterie is
             config.vrfCoordinator,
             config.goldToken,
             config.vrfSubscriptionId,
-            config.vrfNativePayment,
             config.keyHash,
             config.callbackGasLimit,
             config.requestConfirmations,
@@ -188,19 +183,12 @@ contract Lotterie is
         emit RandomDrawCooldownUpdated(previous, randomDrawCooldown);
     }
 
-    /// @inheritdoc ILotterie
-    function setVrfNativePayment(bool vrfNativePayment) external override onlyRole(OWNER_ROLE) {
-        bool previous = _vrfNativePayment;
-        _vrfNativePayment = vrfNativePayment;
-        emit VrfNativePaymentUpdated(previous, vrfNativePayment);
-    }
-
     /*//////////////////////////////////////////////////////////////
                             CORE FUNCTIONS
     //////////////////////////////////////////////////////////////*/
 
     /// @inheritdoc ILotterie
-    function randomDraw() external override onlyRole(OWNER_ROLE) returns (uint256) {
+    function randomDraw(bool enableNativePayment) external override onlyRole(OWNER_ROLE) returns (uint256) {
         if (_lastRandomDraw + _randomDrawCooldown > block.timestamp) {
             revert DrawCooldownNotExpired(_lastRandomDraw, _randomDrawCooldown, block.timestamp);
         }
@@ -212,7 +200,9 @@ contract Lotterie is
                 requestConfirmations: _requestConfirmations,
                 callbackGasLimit: _callbackGasLimit,
                 numWords: _numWords,
-                extraArgs: VRFV2PlusClient._argsToBytes(VRFV2PlusClient.ExtraArgsV1({nativePayment: _vrfNativePayment}))
+                extraArgs: VRFV2PlusClient._argsToBytes(
+                    VRFV2PlusClient.ExtraArgsV1({nativePayment: enableNativePayment})
+                )
             })
         );
 
@@ -223,14 +213,19 @@ contract Lotterie is
     }
 
     function fulfillRandomWords(uint256 requestId, uint256[] calldata randomWords) internal override {
-        // transform the result to a number between 0 and number of participants
-        address[] memory users = _goldToken.getUsers();
-        uint256 index = (randomWords[0] % users.length);
+        uint256 userCount = _goldToken.getUserCount();
+        if (userCount == 0) {
+            emit Winner(address(0));
+            return;
+        }
 
-        _results[requestId] = users[index];
-        _gains[users[index]] = _goldToken.balanceOf(address(this));
+        uint256 index = (randomWords[0] % userCount);
+        address winner = _goldToken.getUserByIndex(index);
 
-        emit Winner(users[index]);
+        _results[requestId] = winner;
+        _gains[winner] = _goldToken.balanceOf(address(this));
+
+        emit Winner(winner);
     }
 
     /// @inheritdoc ILotterie
@@ -308,10 +303,5 @@ contract Lotterie is
     /// @inheritdoc ILotterie
     function getRandomDrawCooldown() external view override returns (uint256) {
         return _randomDrawCooldown;
-    }
-
-    /// @inheritdoc ILotterie
-    function getVrfNativePayment() external view override returns (bool) {
-        return _vrfNativePayment;
     }
 }
