@@ -44,9 +44,10 @@ contract LotterieFuzzTest is Test {
                 vrfSubscriptionId,
                 address(vrfCoordinator),
                 bytes32(0x787d74caea10b2b357790d5b5247c2f63d1d91572a9846f780606e4d953677ae),
-                100000,
+                40_000,
                 3,
                 1,
+                86_400, // One day
                 address(goldToken)
             )
         );
@@ -96,7 +97,7 @@ contract LotterieFuzzTest is Test {
 
         vm.warp(block.timestamp + 1 days);
 
-        uint256 requestId = lotterie.randomDraw();
+        uint256 requestId = lotterie.randomDraw(false);
         assertGt(requestId, 0, "Request ID should be positive");
 
         // Fulfill the randomness
@@ -129,7 +130,7 @@ contract LotterieFuzzTest is Test {
 
         vm.warp(block.timestamp + 1 days);
 
-        uint256 requestId = lotterie.randomDraw();
+        uint256 requestId = lotterie.randomDraw(false);
         vrfCoordinator.fulfillRandomWords(requestId, address(lotterie));
 
         address winner = lotterie.getResults(requestId);
@@ -145,23 +146,31 @@ contract LotterieFuzzTest is Test {
     }
 
     /// @notice Fuzz test time constraints between draws
-    function testFuzz_randomDraw_timeConstraints(uint32 timeElapsed) public {
-        vm.assume(timeElapsed < 2 days);
+    function testFuzz_randomDraw_timeConstraints(uint32 timeElapsed, uint32 cooldown) public {
+        vm.assume(cooldown > 1 hours);
+        vm.assume(cooldown < 365 days);
+        vm.assume(timeElapsed < cooldown * 2);
+
+        lotterie.setRandomDrawCooldown(cooldown);
 
         vm.deal(address(this), 1 ether);
         goldToken.mint{value: 1 ether}();
 
-        vm.warp(block.timestamp + 1 days);
-        lotterie.randomDraw();
+        vm.warp(block.timestamp + cooldown);
+        lotterie.randomDraw(false);
 
         vm.warp(block.timestamp + timeElapsed);
 
-        if (timeElapsed < 1 days) {
-            vm.expectRevert(ILotterie.OneRandomDrawPerDay.selector);
-            lotterie.randomDraw();
+        if (timeElapsed < cooldown) {
+            vm.expectRevert(
+                abi.encodeWithSelector(
+                    ILotterie.DrawCooldownNotExpired.selector, block.timestamp - timeElapsed, cooldown, block.timestamp
+                )
+            );
+            lotterie.randomDraw(false);
         } else {
-            uint256 requestId = lotterie.randomDraw();
-            assertGt(requestId, 0, "Should succeed after 1 day");
+            uint256 requestId = lotterie.randomDraw(false);
+            assertGt(requestId, 0, "Should succeed after cooldown");
         }
     }
 
@@ -186,7 +195,7 @@ contract LotterieFuzzTest is Test {
         for (uint256 i = 0; i < drawCount; i++) {
             currentTime += 1 days + 1;
             vm.warp(currentTime);
-            uint256 requestId = lotterie.randomDraw();
+            uint256 requestId = lotterie.randomDraw(false);
             assertGt(requestId, 0, "Request ID should be positive");
 
             vrfCoordinator.fulfillRandomWords(requestId, address(lotterie));
@@ -215,7 +224,7 @@ contract LotterieFuzzTest is Test {
         }
 
         vm.warp(block.timestamp + 1 days);
-        uint256 requestId = lotterie.randomDraw();
+        uint256 requestId = lotterie.randomDraw(false);
         vrfCoordinator.fulfillRandomWords(requestId, address(lotterie));
 
         address winner = lotterie.getResults(requestId);
@@ -252,7 +261,7 @@ contract LotterieFuzzTest is Test {
         uint256 balanceBefore = goldToken.balanceOf(address(lotterie));
         vm.assume(balanceBefore > 0);
 
-        uint256 requestId = lotterie.randomDraw();
+        uint256 requestId = lotterie.randomDraw(false);
         vrfCoordinator.fulfillRandomWords(requestId, address(lotterie));
 
         address winner = lotterie.getResults(requestId);
@@ -287,7 +296,7 @@ contract LotterieFuzzTest is Test {
         newGoldToken.mint{value: mintAmount2}();
 
         vm.warp(block.timestamp + 1 days);
-        uint256 requestId = lotterie.randomDraw();
+        uint256 requestId = lotterie.randomDraw(false);
         vrfCoordinator.fulfillRandomWords(requestId, address(lotterie));
 
         address winner = lotterie.getResults(requestId);
@@ -298,7 +307,7 @@ contract LotterieFuzzTest is Test {
     /// @notice Documents that draws without users keep winner unset
     function test_randomDraw_withoutUsersLeavesWinnerUnset() public {
         vm.warp(block.timestamp + 1 days);
-        uint256 requestId = lotterie.randomDraw();
+        uint256 requestId = lotterie.randomDraw(false);
 
         vrfCoordinator.fulfillRandomWords(requestId, address(lotterie));
 

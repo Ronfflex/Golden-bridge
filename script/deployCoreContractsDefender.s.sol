@@ -4,6 +4,7 @@ pragma solidity 0.8.28;
 import {Script, console2} from "forge-std/Script.sol";
 import {GoldToken} from "../src/GoldToken.sol";
 import {Lotterie} from "../src/Lotterie.sol";
+import {ILotterie} from "../src/interfaces/ILotterie.sol";
 import {TokenBridge} from "../src/TokenBridge.sol";
 import {ApprovalProcessResponse, Defender} from "openzeppelin-foundry-upgrades/Defender.sol";
 import {Options, Upgrades} from "openzeppelin-foundry-upgrades/Upgrades.sol";
@@ -15,16 +16,17 @@ import {Options, Upgrades} from "openzeppelin-foundry-upgrades/Upgrades.sol";
  *      openzeppelin-foundry-upgrades so relayers/Safe approvals can manage ownership.
  */
 contract DeployCoreContractsWithDefender is Script {
+    // Network specific configurations
     struct NetworkConfig {
-        address router;
-        address link;
-        uint256 vrfSubscriptionId;
-        uint64 chainSelector;
-        uint64 destSelector;
-        address goldUsdFeed;
-        address ethUsdFeed;
-        address vrfCoordinator;
-        bytes32 keyHash;
+        address router; // CCIP Router
+        address link; // LINK Token
+        uint256 vrfSubscriptionId; // VRF Subscription ID
+        uint64 chainSelector; // This chain's selector
+        uint64 destSelector; // Destination chain's selector
+        address goldUsdFeed; // Gold/USD price feed
+        address ethUsdFeed; // ETH/USD or BNB/USD price feed
+        address vrfCoordinator; // VRF Coordinator
+        bytes32 keyHash; // VRF key hash
     }
 
     error UnsupportedNetwork(uint256 chainId);
@@ -56,9 +58,10 @@ contract DeployCoreContractsWithDefender is Script {
         keyHash: 0x8596b430971ac45bdf6088665b9ad8e8630c9d5049ab54b14dff711bee7c0e26
     });
 
-    uint32 constant CALLBACK_GAS_LIMIT = 40000;
+    uint32 constant CALLBACK_GAS_LIMIT = 40_000;
     uint16 constant REQUEST_CONFIRMATIONS = 3;
     uint32 constant NUM_WORDS = 1;
+    uint32 constant RANDOM_DRAW_COOLDOWN = 1 days;
 
     function run() external {
         NetworkConfig memory config = _currentNetwork();
@@ -79,16 +82,17 @@ contract DeployCoreContractsWithDefender is Script {
             "src/Lotterie.sol",
             abi.encodeCall(
                 Lotterie.initialize,
-                (
-                    owner,
-                    config.vrfSubscriptionId,
-                    config.vrfCoordinator,
-                    config.keyHash,
-                    CALLBACK_GAS_LIMIT,
-                    REQUEST_CONFIRMATIONS,
-                    NUM_WORDS,
-                    goldTokenProxy
-                )
+                (ILotterie.LotterieConfig({
+                        owner: owner,
+                        vrfSubscriptionId: config.vrfSubscriptionId,
+                        vrfCoordinator: config.vrfCoordinator,
+                        keyHash: config.keyHash,
+                        callbackGasLimit: CALLBACK_GAS_LIMIT,
+                        requestConfirmations: REQUEST_CONFIRMATIONS,
+                        numWords: NUM_WORDS,
+                        randomDrawCooldown: RANDOM_DRAW_COOLDOWN,
+                        goldToken: goldTokenProxy
+                    }))
             ),
             lotterieOpts
         );

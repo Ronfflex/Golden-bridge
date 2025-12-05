@@ -47,11 +47,14 @@ contract Lotterie is
     /// @notice Amount of random words requested per draw
     uint32 internal _numWords;
 
+    /// @notice randomDrawCooldown amount of time required between draws
+    uint256 internal _randomDrawCooldown;
+
+    /// @notice Timestamp of the most recent draw, used to enforce the cooldown period
+    uint256 internal _lastRandomDraw;
+
     /// @notice GoldToken proxy feeding participant balances and payouts
     IGoldToken internal _goldToken;
-
-    /// @notice Timestamp of the most recent draw, used to enforce the daily cadence
-    uint256 internal _lastRandomDraw;
 
     /// @notice Historical record of VRF request identifiers
     uint256[] internal _requestIds;
@@ -74,41 +77,33 @@ contract Lotterie is
     }
 
     /// @inheritdoc ILotterie
-    function initialize(
-        address owner,
-        uint256 vrfSubscriptionId,
-        address vrfCoordinator,
-        bytes32 keyHash,
-        uint32 callbackGasLimit,
-        uint16 requestConfirmations,
-        uint32 numWords,
-        address goldToken
-    ) external override initializer {
+    function initialize(LotterieConfig calldata config) external override initializer {
         __AccessControl_init();
 
-        _grantRole(OWNER_ROLE, owner);
+        _grantRole(OWNER_ROLE, config.owner);
 
         _setRoleAdmin(OWNER_ROLE, OWNER_ROLE);
 
-        _vrfSubscriptionId = vrfSubscriptionId;
-        s_vrfCoordinator = IVRFCoordinatorV2Plus(vrfCoordinator);
-        _vrfKeyHash = keyHash;
-        _callbackGasLimit = callbackGasLimit; // 40000
-        _requestConfirmations = requestConfirmations; // 3
-        _numWords = numWords; // 1
-
+        _vrfSubscriptionId = config.vrfSubscriptionId;
+        s_vrfCoordinator = IVRFCoordinatorV2Plus(config.vrfCoordinator);
+        _vrfKeyHash = config.keyHash;
+        _callbackGasLimit = config.callbackGasLimit;
+        _requestConfirmations = config.requestConfirmations;
+        _numWords = config.numWords;
+        _randomDrawCooldown = config.randomDrawCooldown;
         _lastRandomDraw = block.timestamp - 1 days;
-        _goldToken = IGoldToken(goldToken);
+        _goldToken = IGoldToken(config.goldToken);
 
         emit LotterieInitialized(
-            owner,
-            vrfCoordinator,
-            goldToken,
-            vrfSubscriptionId,
-            keyHash,
-            callbackGasLimit,
-            requestConfirmations,
-            numWords
+            config.owner,
+            config.vrfCoordinator,
+            config.goldToken,
+            config.vrfSubscriptionId,
+            config.keyHash,
+            config.callbackGasLimit,
+            config.requestConfirmations,
+            config.numWords,
+            config.randomDrawCooldown
         );
     }
 
@@ -181,14 +176,21 @@ contract Lotterie is
         emit GoldTokenUpdated(previous, goldToken);
     }
 
+    /// @inheritdoc ILotterie
+    function setRandomDrawCooldown(uint256 randomDrawCooldown) external override onlyRole(OWNER_ROLE) {
+        uint256 previous = _randomDrawCooldown;
+        _randomDrawCooldown = randomDrawCooldown;
+        emit RandomDrawCooldownUpdated(previous, randomDrawCooldown);
+    }
+
     /*//////////////////////////////////////////////////////////////
                             CORE FUNCTIONS
     //////////////////////////////////////////////////////////////*/
 
     /// @inheritdoc ILotterie
-    function randomDraw() external override onlyRole(OWNER_ROLE) returns (uint256) {
-        if (_lastRandomDraw + 1 days > block.timestamp) {
-            revert OneRandomDrawPerDay();
+    function randomDraw(bool enableNativePayment) external override onlyRole(OWNER_ROLE) returns (uint256) {
+        if (_lastRandomDraw + _randomDrawCooldown > block.timestamp) {
+            revert DrawCooldownNotExpired(_lastRandomDraw, _randomDrawCooldown, block.timestamp);
         }
 
         uint256 requestId = s_vrfCoordinator.requestRandomWords(
@@ -198,8 +200,9 @@ contract Lotterie is
                 requestConfirmations: _requestConfirmations,
                 callbackGasLimit: _callbackGasLimit,
                 numWords: _numWords,
-                // Set nativePayment to true to pay for VRF requests with Sepolia ETH instead of LINK
-                extraArgs: VRFV2PlusClient._argsToBytes(VRFV2PlusClient.ExtraArgsV1({nativePayment: false}))
+                extraArgs: VRFV2PlusClient._argsToBytes(
+                    VRFV2PlusClient.ExtraArgsV1({nativePayment: enableNativePayment})
+                )
             })
         );
 
@@ -210,14 +213,19 @@ contract Lotterie is
     }
 
     function fulfillRandomWords(uint256 requestId, uint256[] calldata randomWords) internal override {
-        // transform the result to a number between 0 and number of participants
-        address[] memory users = _goldToken.getUsers();
-        uint256 index = (randomWords[0] % users.length);
+        uint256 userCount = _goldToken.getUserCount();
+        if (userCount == 0) {
+            emit Winner(address(0));
+            return;
+        }
 
-        _results[requestId] = users[index];
-        _gains[users[index]] = _goldToken.balanceOf(address(this));
+        uint256 index = (randomWords[0] % userCount);
+        address winner = _goldToken.getUserByIndex(index);
 
-        emit Winner(users[index]);
+        _results[requestId] = winner;
+        _gains[winner] = _goldToken.balanceOf(address(this));
+
+        emit Winner(winner);
     }
 
     /// @inheritdoc ILotterie
@@ -290,5 +298,10 @@ contract Lotterie is
     /// @inheritdoc ILotterie
     function getVrfSubscriptionId() external view override returns (uint256) {
         return _vrfSubscriptionId;
+    }
+
+    /// @inheritdoc ILotterie
+    function getRandomDrawCooldown() external view override returns (uint256) {
+        return _randomDrawCooldown;
     }
 }

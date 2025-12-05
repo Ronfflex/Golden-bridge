@@ -1,0 +1,88 @@
+.container {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    width: 100%;
+}
+
+.label {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--color-text);
+}
+
+.inputWrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.input {
+    width: 100%;
+    padding: 0.5rem 0.75rem;
+    font-size: 1rem;
+    line-height: 1.5;
+    color: var(--color-text);
+    background-color: var(--color-background);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    min-height: 44px;
+    /* Touch target size */
+}
+
+/* Mobile adjustments for input */
+@media (max-width: 640px) {
+    .input {
+        padding: 0.75rem;
+        font-size: 16px;
+        /* Prevent zoom on iOS */
+        min-height: 48px;
+        /* Larger touch target */
+    }
+}
+
+.input:focus {
+    outline: none;
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 2px rgba(255, 215, 0, 0.2);
+}
+
+.input:disabled {
+    background-color: var(--color-surface);
+    cursor: not-allowed;
+    opacity: 0.7;
+}
+
+.hasError {
+    border-color: var(--color-error);
+}
+
+.hasError:focus {
+    border-color: var(--color-error);
+    box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.2);
+}
+
+.hasRightElement {
+    padding-right: 2.5rem;
+}
+
+.rightElement {
+    position: absolute;
+    right: 0.75rem;
+    display: flex;
+    align-items: center;
+    color: var(--color-text-muted);
+}
+
+.error {
+    font-size: 0.75rem;
+    color: var(--color-error);
+    margin-top: 0.25rem;
+}
+
+.helperText {
+    font-size: 0.75rem;
+    color: var(--color-text-muted);
+    margin-top: 0.25rem;
+}

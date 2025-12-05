@@ -20,25 +20,6 @@ contract LotterieTest is Test {
     Lotterie public lotterie;
     VRFCoordinatorV2_5Mock public vrfCoordinator;
 
-    event LotterieInitialized(
-        address indexed owner,
-        address indexed vrfCoordinator,
-        address indexed goldToken,
-        uint256 vrfSubscriptionId,
-        bytes32 keyHash,
-        uint32 callbackGasLimit,
-        uint16 requestConfirmations,
-        uint32 numWords
-    );
-    event VrfSubscriptionUpdated(uint256 indexed previousSubscriptionId, uint256 indexed newSubscriptionId);
-    event VrfCoordinatorUpdated(address indexed previousCoordinator, address indexed newCoordinator);
-    event KeyHashUpdated(bytes32 indexed previousKeyHash, bytes32 indexed newKeyHash);
-    event CallbackGasLimitUpdated(uint32 indexed previousGasLimit, uint32 indexed newGasLimit);
-    event RequestConfirmationsUpdated(uint16 indexed previousConfirmations, uint16 indexed newConfirmations);
-    event NumWordsUpdated(uint32 indexed previousNumWords, uint32 indexed newNumWords);
-    event GoldTokenUpdated(address indexed previousGoldToken, address indexed newGoldToken);
-    event GainClaimed(address indexed account, uint256 amount);
-
     function setUp() public {
         vm.deal(address(this), 100 ether);
         // Advance time by 2 days to avoid underflow issues with last random draw time (set during initialization to block.timestamp - 1 days)
@@ -69,9 +50,10 @@ contract LotterieTest is Test {
                 subscription,
                 address(vrfCoordinator),
                 bytes32(0x787d74caea10b2b357790d5b5247c2f63d1d91572a9846f780606e4d953677ae),
-                100000,
+                40_000,
                 3,
                 1,
+                86_400, // One day
                 address(goldToken)
             )
         );
@@ -100,15 +82,22 @@ contract LotterieTest is Test {
     }
 
     function test_randomDrawBefore1DayWaiting() public {
+        uint256 lastDraw = block.timestamp - 1 days;
+        uint256 cooldown = 1 days;
+
         vm.warp(block.timestamp - 1 hours);
-        vm.expectRevert(ILotterie.OneRandomDrawPerDay.selector);
-        lotterie.randomDraw();
+        uint256 currentTime = block.timestamp;
+
+        vm.expectRevert(
+            abi.encodeWithSelector(ILotterie.DrawCooldownNotExpired.selector, lastDraw, cooldown, currentTime)
+        );
+        lotterie.randomDraw(false);
     }
 
     function test_randomDraw() public {
         vm.warp(block.timestamp + 1 days);
         vm.recordLogs();
-        uint256 requestId = lotterie.randomDraw();
+        uint256 requestId = lotterie.randomDraw(false);
 
         Vm.Log[] memory logs = vm.getRecordedLogs();
         (Vm.Log memory randomDrawLog, bool found) = _findLog(logs, keccak256("RandomDrawed(uint256)"));
@@ -121,7 +110,7 @@ contract LotterieTest is Test {
     function test_randomDrawFulfillmentAndClaimFlow() public {
         vm.warp(block.timestamp + 1 days);
         goldToken.mint{value: 1 ether}();
-        uint256 requestId = lotterie.randomDraw();
+        uint256 requestId = lotterie.randomDraw(false);
 
         assertEq(lotterie.getLastRequestId(), requestId, "last request id should match the recent draw");
 
@@ -145,7 +134,7 @@ contract LotterieTest is Test {
         uint256 winnerBalanceBefore = goldToken.balanceOf(winner);
 
         vm.expectEmit(true, false, false, true, address(lotterie));
-        emit GainClaimed(winner, gains);
+        emit ILotterie.GainClaimed(winner, gains);
         vm.prank(winner);
         lotterie.claim();
 
@@ -161,7 +150,7 @@ contract LotterieTest is Test {
     function test_claim_reverts_when_transfer_fails() public {
         vm.warp(block.timestamp + 1 days);
         goldToken.mint{value: 1 ether}();
-        uint256 requestId = lotterie.randomDraw();
+        uint256 requestId = lotterie.randomDraw(false);
         vrfCoordinator.fulfillRandomWords(requestId, address(lotterie));
 
         address winner = lotterie.getResults(requestId);
@@ -184,7 +173,7 @@ contract LotterieTest is Test {
     function test_setVrfSubscriptionId() public {
         uint256 previous = lotterie.getVrfSubscriptionId();
         vm.expectEmit(true, true, false, false, address(lotterie));
-        emit VrfSubscriptionUpdated(previous, 10);
+        emit ILotterie.VrfSubscriptionUpdated(previous, 10);
         lotterie.setVrfSubscriptionId(10);
         uint256 vrfSubscriptionId = lotterie.getVrfSubscriptionId();
         assertEq(vrfSubscriptionId, 10, "vrfSubscriptionId should be 10");
@@ -193,7 +182,7 @@ contract LotterieTest is Test {
     function test_setVrfCoordinator() public {
         address previous = lotterie.getVrfCoordinator();
         vm.expectEmit(true, true, false, false, address(lotterie));
-        emit VrfCoordinatorUpdated(previous, address(0x1));
+        emit ILotterie.VrfCoordinatorUpdated(previous, address(0x1));
         lotterie.setVrfCoordinator(address(0x1));
         address vrf = lotterie.getVrfCoordinator();
         assertEq(vrf, address(0x1), "vrfCoordinator should be 0x1");
@@ -202,7 +191,7 @@ contract LotterieTest is Test {
     function test_setKeyHash() public {
         bytes32 expectedKeyHash = keccak256(abi.encodePacked("test-key-hash"));
         vm.expectEmit(true, true, false, false, address(lotterie));
-        emit KeyHashUpdated(lotterie.getKeyHash(), expectedKeyHash);
+        emit ILotterie.KeyHashUpdated(lotterie.getKeyHash(), expectedKeyHash);
         lotterie.setKeyHash(expectedKeyHash);
         bytes32 keyHash = lotterie.getKeyHash();
         assertEq(keyHash, expectedKeyHash, "keyHash should match expected value");
@@ -210,7 +199,7 @@ contract LotterieTest is Test {
 
     function test_setCallbackGasLimit() public {
         vm.expectEmit(true, true, false, false, address(lotterie));
-        emit CallbackGasLimitUpdated(lotterie.getCallbackGasLimit(), 10);
+        emit ILotterie.CallbackGasLimitUpdated(lotterie.getCallbackGasLimit(), 10);
         lotterie.setCallbackGasLimit(10);
         uint32 gasLimit = lotterie.getCallbackGasLimit();
         assertEq(gasLimit, 10, "gasLimit should be 10");
@@ -218,7 +207,7 @@ contract LotterieTest is Test {
 
     function test_setRequestConfirmations() public {
         vm.expectEmit(true, true, false, false, address(lotterie));
-        emit RequestConfirmationsUpdated(lotterie.getRequestConfirmations(), 10);
+        emit ILotterie.RequestConfirmationsUpdated(lotterie.getRequestConfirmations(), 10);
         lotterie.setRequestConfirmations(10);
         uint16 confirmations = lotterie.getRequestConfirmations();
         assertEq(confirmations, 10, "confirmations should be 10");
@@ -226,7 +215,7 @@ contract LotterieTest is Test {
 
     function test_setNumWords() public {
         vm.expectEmit(true, true, false, false, address(lotterie));
-        emit NumWordsUpdated(lotterie.getNumWords(), 10);
+        emit ILotterie.NumWordsUpdated(lotterie.getNumWords(), 10);
         lotterie.setNumWords(10);
         uint32 numWords = lotterie.getNumWords();
         assertEq(numWords, 10, "numWords should be 10");
@@ -234,17 +223,24 @@ contract LotterieTest is Test {
 
     function test_setGoldToken() public {
         vm.expectEmit(true, true, false, false, address(lotterie));
-        emit GoldTokenUpdated(address(goldToken), address(0x1));
+        emit ILotterie.GoldTokenUpdated(address(goldToken), address(0x1));
         lotterie.setGoldToken(address(0x1));
         address goldTokenAddress = lotterie.getGoldToken();
         assertEq(goldTokenAddress, address(0x1), "goldToken should be 0x1");
+    }
+
+    function test_setRandomDrawCooldown() public {
+        vm.expectEmit(true, true, false, false, address(lotterie));
+        emit ILotterie.RandomDrawCooldownUpdated(lotterie.getRandomDrawCooldown(), 1 days + 1);
+        lotterie.setRandomDrawCooldown(1 days + 1);
+        assertEq(lotterie.getRandomDrawCooldown(), 1 days + 1, "cooldown should be updated");
     }
 
     function test_initialize_emits_event() public {
         Lotterie implementation = new Lotterie(address(vrfCoordinator));
         uint256 subscription = vrfCoordinator.createSubscription();
         vm.expectEmit(true, true, true, true);
-        emit LotterieInitialized(
+        emit ILotterie.LotterieInitialized(
             address(this),
             address(vrfCoordinator),
             address(goldToken),
@@ -252,7 +248,8 @@ contract LotterieTest is Test {
             bytes32(uint256(0x1111)),
             50_000,
             2,
-            1
+            1,
+            86400
         );
         new ERC1967Proxy(
             address(implementation),
@@ -265,6 +262,7 @@ contract LotterieTest is Test {
                 50_000,
                 2,
                 1,
+                86400,
                 address(goldToken)
             )
         );
